@@ -5,6 +5,58 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CricketBet — Dashboard</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    /* ── Match Cards on Dashboard ── */
+    .matches-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .dash-match-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .dash-match-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0;
+      width: 3px; height: 100%;
+      background: var(--green);
+    }
+    .dash-match-card.upcoming::before { background: var(--blue); }
+    .dash-match-card:hover { border-color: var(--green-lt); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+    .dash-match-card h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 6px; line-height: 1.4; }
+    .dash-match-card .match-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .dash-match-card .venue { font-size: 0.78rem; color: var(--text2); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+    .dash-match-card .create-hint {
+      margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+      font-size: 0.8rem; color: var(--green-lt); font-weight: 600;
+    }
+    .status-live { display: inline-flex; align-items: center; gap: 5px; font-size: 0.78rem; font-weight: 700; color: #f87171; }
+    .status-upcoming { font-size: 0.78rem; color: #93c5fd; font-weight: 600; }
+    .status-other { font-size: 0.78rem; color: var(--text2); }
+
+    /* filter tabs */
+    .filter-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .filter-tab {
+      padding: 6px 16px; border-radius: 20px; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; border: 1px solid var(--border); background: var(--bg3);
+      color: var(--text2); transition: all 0.2s;
+    }
+    .filter-tab.active { background: var(--green); border-color: var(--green); color: var(--white); }
+
+    /* modal match list improved */
+    .modal-match-list { max-height: 220px; overflow-y: auto; }
+    .modal-match-list::-webkit-scrollbar { width: 4px; }
+    .modal-match-list::-webkit-scrollbar-track { background: var(--bg3); }
+    .modal-match-list::-webkit-scrollbar-thumb { background: var(--green); border-radius: 2px; }
+    .modal { max-height: 90vh; overflow-y: auto; }
+  </style>
 </head>
 <body>
 
@@ -42,9 +94,31 @@
 <!-- MAIN CONTENT -->
 <div class="container">
 
+  <!-- LIVE & UPCOMING MATCHES -->
+  <section>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <h2 style="margin-bottom:0">🏏 Live &amp; Upcoming Matches</h2>
+      <button class="btn btn-outline btn-sm" onclick="loadDashboardMatches(true)">🔄 Refresh</button>
+    </div>
+
+    <div class="filter-tabs" id="match-filter-tabs">
+      <div class="filter-tab active" onclick="filterMatches('all', this)">All</div>
+      <div class="filter-tab" onclick="filterMatches('live', this)">🔴 Live</div>
+      <div class="filter-tab" onclick="filterMatches('t20', this)">T20</div>
+      <div class="filter-tab" onclick="filterMatches('odi', this)">ODI</div>
+      <div class="filter-tab" onclick="filterMatches('test', this)">Test</div>
+    </div>
+
+    <div id="dashboard-matches">
+      <div class="loading"><div class="spinner"></div>Fetching matches…</div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
   <!-- ACTIVE GAMES -->
   <section>
-    <h2>🟢 Active Games</h2>
+    <h2>🟢 My Active Games</h2>
     <div id="active-games">
       <div class="loading"><div class="spinner"></div>Loading…</div>
     </div>
@@ -68,6 +142,21 @@
     <h3>🎮 Create New Game</h3>
     <div id="create-alert"></div>
 
+    <!-- Selected match preview -->
+    <div id="selected-match-preview" class="hidden" style="background:rgba(26,122,60,0.12);border:1px solid rgba(26,122,60,0.3);border-radius:8px;padding:12px;margin-bottom:16px">
+      <div style="font-size:0.75rem;color:var(--green-lt);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">✅ Selected Match</div>
+      <div id="selected-match-name" style="font-weight:600;font-size:0.95rem"></div>
+      <div id="selected-match-meta" style="font-size:0.8rem;color:var(--text2);margin-top:2px"></div>
+      <button onclick="clearMatchSelection()" style="font-size:0.75rem;color:var(--text2);background:none;border:none;cursor:pointer;margin-top:4px;padding:0">✕ Change match</button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Select Match <span style="color:var(--text2)">(click to select)</span></label>
+      <div class="modal-match-list" id="match-list">
+        <div class="loading" style="padding:16px"><div class="spinner"></div>Fetching matches…</div>
+      </div>
+    </div>
+
     <div class="form-group">
       <label class="form-label">Match Format</label>
       <select class="form-control" id="c-format">
@@ -75,13 +164,6 @@
         <option value="odi">ODI</option>
         <option value="test">Test</option>
       </select>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Select Live Match <span style="color:var(--text2)">(optional)</span></label>
-      <div id="match-list">
-        <div class="loading" style="padding:16px"><div class="spinner"></div>Fetching matches…</div>
-      </div>
     </div>
 
     <div class="form-row">
@@ -153,6 +235,8 @@ if (!requireAuth()) throw new Error('not authed');
 
 const user = getUser();
 let selectedMatchId = null;
+let allMatches = [];
+let currentFilter = 'all';
 
 // Populate page
 document.getElementById('hero-name').textContent = user.username;
@@ -164,101 +248,141 @@ apiFetch('/auth/me').then(d => {
   const u = getUser(); u.wallet_balance = d.wallet_balance; localStorage.setItem('cb_user', JSON.stringify(u));
 }).catch(() => {});
 
-// Load game history
-async function loadGames() {
+// ── Dashboard Match Cards ─────────────────
+async function loadDashboardMatches(forceRefresh = false) {
+  const el = document.getElementById('dashboard-matches');
+  if (!forceRefresh && allMatches.length) { renderDashboardMatches(allMatches); return; }
+  el.innerHTML = '<div class="loading"><div class="spinner"></div>Fetching matches…</div>';
   try {
-    const games = await apiFetch('/games/my-games');
-    const active = games.filter(g => g.status !== 'finished');
-    const history = games.filter(g => g.status === 'finished');
-    renderActive(active);
-    renderHistory(history);
-  } catch (e) {
-    document.getElementById('active-games').innerHTML = `<div class="alert alert-error">${escHtml(e.message)}</div>`;
+    allMatches = await apiFetch('/cricket/matches');
+    renderDashboardMatches(allMatches);
+  } catch {
+    el.innerHTML = '<p class="text-muted" style="padding:12px">Could not load matches.</p>';
   }
 }
 
-function renderActive(games) {
-  const el = document.getElementById('active-games');
-  if (!games.length) {
-    el.innerHTML = `<p class="text-muted" style="padding:12px">No active games. Create one or join a friend!</p>`;
+function getMatchStatusClass(status) {
+  const s = (status || '').toLowerCase();
+  if (s.includes('live') || s.includes('day') || s.includes('innings') || s.includes('session')) return 'live';
+  if (s.includes('upcoming') || s.includes('scheduled') || s.includes('toss')) return 'upcoming';
+  return 'other';
+}
+
+function renderDashboardMatches(matches) {
+  const el = document.getElementById('dashboard-matches');
+  let filtered = matches;
+  if (currentFilter === 'live') {
+    filtered = matches.filter(m => getMatchStatusClass(m.status) === 'live');
+  } else if (['t20','odi','test'].includes(currentFilter)) {
+    filtered = matches.filter(m => m.matchType === currentFilter);
+  }
+
+  if (!filtered.length) {
+    el.innerHTML = `<p class="text-muted" style="padding:12px">No ${currentFilter === 'all' ? '' : currentFilter + ' '}matches found.</p>`;
     return;
   }
-  el.innerHTML = games.map(g => {
-    const href = g.status === 'live' ? `/scoreboard.html?game=${g.id}` : `/lobby.html?game=${g.id}`;
+
+  el.innerHTML = `<div class="matches-grid">${filtered.map(m => {
+    const statusClass = getMatchStatusClass(m.status);
+    const isLive = statusClass === 'live';
     return `
-    <div class="game-item" style="cursor:pointer" onclick="location.href='${href}'">
-      <div>
-        <div class="game-teams">${escHtml(g.team_a_name)} vs ${escHtml(g.team_b_name)}</div>
-        <div class="game-meta mt-2">${formatBadge(g.format)} &nbsp;${g.player_count} player(s) &nbsp;• Bet: <strong>${formatPoints(g.bet_amount)}</strong> &nbsp;• Room: <code style="color:var(--gold)">${g.room_code}</code></div>
+    <div class="dash-match-card ${statusClass !== 'live' ? 'upcoming' : ''}"
+         onclick="openCreateFromMatch('${m.id}','${escHtml(m.teams[0]||'')}','${escHtml(m.teams[1]||'')}','${m.matchType}','${escHtml(m.name)}','${escHtml(m.status)}')">
+      <h4>${escHtml(m.name)}</h4>
+      <div class="match-info">
+        ${formatBadge(m.matchType)}
+        ${isLive
+          ? `<span class="status-live"><span class="live-dot"></span>LIVE</span>`
+          : statusClass === 'upcoming'
+            ? `<span class="status-upcoming">⏰ ${escHtml(m.status)}</span>`
+            : `<span class="status-other">${escHtml(m.status)}</span>`}
       </div>
-      <div style="text-align:right">
-        <span class="badge ${g.status === 'live' ? 'badge-live' : 'badge-info'}" style="${g.status==='live'?'':'background:rgba(59,130,246,0.2);color:#93c5fd'}">${g.status.toUpperCase()}</span>
-        <div style="font-size:0.8rem;color:var(--text2);margin-top:4px">→ Open</div>
-      </div>
+      ${m.venue ? `<div class="venue">📍 ${escHtml(m.venue)}</div>` : ''}
+      <div class="create-hint">🎮 Click to create a game →</div>
     </div>`;
-  }).join('');
+  }).join('')}</div>`;
 }
 
-function renderHistory(games) {
-  const el = document.getElementById('history-games');
-  if (!games.length) {
-    el.innerHTML = `<p class="text-muted" style="padding:12px">No finished games yet.</p>`;
-    return;
-  }
-  el.innerHTML = games.map(g => {
-    const won = g.winner_id === user.id;
-    return `
-    <div class="game-item">
-      <div>
-        <div class="game-teams">${escHtml(g.team_a_name)} vs ${escHtml(g.team_b_name)}</div>
-        <div class="game-meta mt-2">${formatBadge(g.format)} &nbsp;${g.player_count} player(s) &nbsp;• Bet: ${formatPoints(g.bet_amount)}</div>
-        ${g.winner_username ? `<div class="game-meta mt-2">🏆 Winner: <strong>${escHtml(g.winner_username)}</strong></div>` : ''}
-      </div>
-      <div style="text-align:right">
-        <span class="badge ${won ? 'badge-win' : 'badge-done'}">${won ? '🏆 WON' : 'LOST'}</span>
-        <div class="game-runs mt-2">${g.total_runs} runs</div>
-      </div>
-    </div>`;
-  }).join('');
+function filterMatches(type, tabEl) {
+  currentFilter = type;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  tabEl.classList.add('active');
+  renderDashboardMatches(allMatches);
 }
 
-// ── Create Game ──────────────────────────
+// ── Create from dashboard match click ────
+function openCreateFromMatch(id, teamA, teamB, fmt, name, status) {
+  showCreate();
+  // Pre-select this match after modal loads
+  setTimeout(() => {
+    selectMatch(id, teamA, teamB, fmt, name, status);
+  }, 300);
+}
+
+// ── Create Game Modal ─────────────────────
 function showCreate() {
   document.getElementById('create-modal').classList.remove('hidden');
-  loadMatches();
+  loadModalMatches();
 }
 function hideCreate() {
   document.getElementById('create-modal').classList.add('hidden');
   selectedMatchId = null;
+  document.getElementById('selected-match-preview').classList.add('hidden');
 }
 
 document.getElementById('c-bet').addEventListener('change', function() {
   document.getElementById('custom-bet-group').classList.toggle('hidden', this.value !== 'custom');
 });
 
-async function loadMatches() {
+async function loadModalMatches() {
   const el = document.getElementById('match-list');
   try {
-    const matches = await apiFetch('/cricket/matches');
-    if (!matches.length) { el.innerHTML = '<p class="text-muted" style="font-size:0.85rem">No matches available</p>'; return; }
-    el.innerHTML = matches.map(m => `
-      <div class="match-card" id="match-${m.id}" onclick="selectMatch('${m.id}','${escHtml(m.teams[0]||'')}','${escHtml(m.teams[1]||'')}','${m.matchType}')">
-        <h4>${escHtml(m.name)}</h4>
-        <p>${formatBadge(m.matchType)} &nbsp; ${escHtml(m.status)} &nbsp;• ${escHtml(m.venue || '')}</p>
-      </div>
-    `).join('');
+    const matches = allMatches.length ? allMatches : await apiFetch('/cricket/matches');
+    if (!allMatches.length) allMatches = matches;
+    if (!matches.length) { el.innerHTML = '<p class="text-muted" style="font-size:0.85rem;padding:8px">No matches available</p>'; return; }
+    el.innerHTML = matches.map(m => {
+      const statusClass = getMatchStatusClass(m.status);
+      const isLive = statusClass === 'live';
+      return `
+      <div class="match-card" id="modal-match-${m.id}"
+           onclick="selectMatch('${m.id}','${escHtml(m.teams[0]||'')}','${escHtml(m.teams[1]||'')}','${m.matchType}','${escHtml(m.name)}','${escHtml(m.status)}')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <h4 style="margin:0;font-size:0.9rem">${escHtml(m.name)}</h4>
+          ${isLive ? `<span class="status-live" style="white-space:nowrap"><span class="live-dot"></span>LIVE</span>` : ''}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+          ${formatBadge(m.matchType)}
+          <span style="font-size:0.78rem;color:var(--text2)">${escHtml(m.status)}</span>
+          ${m.venue ? `<span style="font-size:0.75rem;color:var(--text2)">📍 ${escHtml(m.venue)}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
   } catch {
-    el.innerHTML = '<p class="text-muted" style="font-size:0.85rem">Could not load matches</p>';
+    el.innerHTML = '<p class="text-muted" style="font-size:0.85rem;padding:8px">Could not load matches</p>';
   }
 }
 
-function selectMatch(id, teamA, teamB, fmt) {
+function selectMatch(id, teamA, teamB, fmt, name, status) {
   selectedMatchId = id;
+  // Highlight in modal list
   document.querySelectorAll('.match-card').forEach(c => c.classList.remove('selected'));
-  document.getElementById('match-'+id)?.classList.add('selected');
+  document.getElementById('modal-match-'+id)?.classList.add('selected');
+  // Auto-fill fields
   document.getElementById('c-team-a').value = teamA;
   document.getElementById('c-team-b').value = teamB;
   document.getElementById('c-format').value = fmt;
+  // Show preview banner
+  document.getElementById('selected-match-name').textContent = name || `${teamA} vs ${teamB}`;
+  document.getElementById('selected-match-meta').textContent = `${fmt.toUpperCase()} · ${status}`;
+  document.getElementById('selected-match-preview').classList.remove('hidden');
+}
+
+function clearMatchSelection() {
+  selectedMatchId = null;
+  document.querySelectorAll('.match-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('selected-match-preview').classList.add('hidden');
+  document.getElementById('c-team-a').value = '';
+  document.getElementById('c-team-b').value = '';
 }
 
 async function createGame() {
@@ -289,7 +413,63 @@ async function createGame() {
   }
 }
 
-// ── Join Game ──────────────────────────
+// ── My Games ──────────────────────────────
+async function loadGames() {
+  try {
+    const games = await apiFetch('/games/my-games');
+    renderActive(games.filter(g => g.status !== 'finished'));
+    renderHistory(games.filter(g => g.status === 'finished'));
+  } catch (e) {
+    document.getElementById('active-games').innerHTML = `<div class="alert alert-error">${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderActive(games) {
+  const el = document.getElementById('active-games');
+  if (!games.length) {
+    el.innerHTML = `<p class="text-muted" style="padding:12px">No active games. Create one or join a friend!</p>`;
+    return;
+  }
+  el.innerHTML = `<div class="game-list">${games.map(g => {
+    const href = g.status === 'live' ? `/scoreboard.html?game=${g.id}` : `/lobby.html?game=${g.id}`;
+    return `
+    <div class="game-item" style="cursor:pointer" onclick="location.href='${href}'">
+      <div>
+        <div class="game-teams">${escHtml(g.team_a_name)} vs ${escHtml(g.team_b_name)}</div>
+        <div class="game-meta mt-2">${formatBadge(g.format)} &nbsp;${g.player_count} player(s) &nbsp;• Bet: <strong>${formatPoints(g.bet_amount)}</strong> &nbsp;• Room: <code style="color:var(--gold)">${g.room_code}</code></div>
+      </div>
+      <div style="text-align:right">
+        <span class="badge ${g.status === 'live' ? 'badge-live' : ''}" style="${g.status==='live'?'':'background:rgba(59,130,246,0.2);color:#93c5fd'}">${g.status.toUpperCase()}</span>
+        <div style="font-size:0.8rem;color:var(--text2);margin-top:4px">→ Open</div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderHistory(games) {
+  const el = document.getElementById('history-games');
+  if (!games.length) {
+    el.innerHTML = `<p class="text-muted" style="padding:12px">No finished games yet.</p>`;
+    return;
+  }
+  el.innerHTML = `<div class="game-list">${games.map(g => {
+    const won = g.winner_id === user.id;
+    return `
+    <div class="game-item">
+      <div>
+        <div class="game-teams">${escHtml(g.team_a_name)} vs ${escHtml(g.team_b_name)}</div>
+        <div class="game-meta mt-2">${formatBadge(g.format)} &nbsp;${g.player_count} player(s) &nbsp;• Bet: ${formatPoints(g.bet_amount)}</div>
+        ${g.winner_username ? `<div class="game-meta mt-2">🏆 Winner: <strong>${escHtml(g.winner_username)}</strong></div>` : ''}
+      </div>
+      <div style="text-align:right">
+        <span class="badge ${won ? 'badge-win' : 'badge-done'}">${won ? '🏆 WON' : 'LOST'}</span>
+        <div class="game-runs mt-2">${g.total_runs} runs</div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// ── Join Game ──────────────────────────────
 function showJoin() { document.getElementById('join-modal').classList.remove('hidden'); }
 function hideJoin()  { document.getElementById('join-modal').classList.add('hidden'); }
 
@@ -314,6 +494,8 @@ async function joinGame() {
   }
 }
 
+// ── Init ──────────────────────────────────
+loadDashboardMatches();
 loadGames();
 </script>
 </body>
