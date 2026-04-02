@@ -227,7 +227,9 @@ router.get('/matches', authMiddleware, async (req, res) => {
   try {
     // Serve from cache if fresh
     const now = Date.now();
-    if (cache.matches && now - cache.matchesAt < CACHE_TTL) return res.json(cache.matches);
+    if (cache.matches && Array.isArray(cache.matches) && cache.matches.length && now - cache.matchesAt < CACHE_TTL) {
+      return res.json(cache.matches);
+    }
 
     let matches = [];
 
@@ -235,16 +237,20 @@ router.get('/matches', authMiddleware, async (req, res) => {
     if (hasRapidKey()) {
       try {
         const [liveRes, recentRes] = await Promise.all([
-          fetch(`${CRICBUZZ_BASE}/matches/v1/live`,   { headers:{ 'X-RapidAPI-Key': RAPIDAPI_KEY, 'X-RapidAPI-Host': CRICBUZZ_HOST } }),
-          fetch(`${CRICBUZZ_BASE}/matches/v1/upcoming`,{ headers:{ 'X-RapidAPI-Key': RAPIDAPI_KEY, 'X-RapidAPI-Host': CRICBUZZ_HOST } })
+          fetch(`${CRICBUZZ_BASE}/matches/v1/live`,    { headers:{ 'X-RapidAPI-Key': RAPIDAPI_KEY, 'X-RapidAPI-Host': CRICBUZZ_HOST } }),
+          fetch(`${CRICBUZZ_BASE}/matches/v1/upcoming`, { headers:{ 'X-RapidAPI-Key': RAPIDAPI_KEY, 'X-RapidAPI-Host': CRICBUZZ_HOST } })
         ]);
-        const liveData   = await liveRes.json();
-        const recentData = await recentRes.json();
-        const live     = parseCricbuzzMatches(liveData);
-        const upcoming = parseCricbuzzMatches(recentData);
-        // Merge, live first, no duplicates
-        const seen = new Set(live.map(m => m.id));
-        matches = [...live, ...upcoming.filter(m => !seen.has(m.id))];
+        if (liveRes.ok && recentRes.ok) {
+          const liveData   = await liveRes.json();
+          const recentData = await recentRes.json();
+          const live     = parseCricbuzzMatches(liveData);
+          const upcoming = parseCricbuzzMatches(recentData);
+          const seen = new Set(live.map(m => m.id));
+          matches = [...live, ...upcoming.filter(m => !seen.has(m.id))];
+          console.log(`Cricbuzz: ${matches.length} matches`);
+        } else {
+          console.warn(`Cricbuzz status: ${liveRes.status}/${recentRes.status}`);
+        }
       } catch (err) {
         console.error('RapidAPI error:', err.message);
       }
@@ -259,24 +265,28 @@ router.get('/matches', authMiddleware, async (req, res) => {
         ]);
         const curData = await curRes.json();
         const allData = await allRes.json();
-        const live    = curData.status === 'success' ? parseCricApiMatches(curData.data) : [];
-        const all     = allData.status === 'success' ? parseCricApiMatches(allData.data) : [];
+        const live    = curData.status === 'success' ? parseCricApiMatches(curData.data || []) : [];
+        const all     = allData.status === 'success' ? parseCricApiMatches(allData.data || []) : [];
         const seen    = new Set(live.map(m => m.id));
         matches = [...live, ...all.filter(m => !seen.has(m.id)).slice(0, 15)];
+        console.log(`CricAPI: ${matches.length} matches`);
       } catch (err) {
         console.error('CricketData API error:', err.message);
       }
     }
 
-    // ── Fallback: Mock data ──
-    if (!matches.length) return res.json(MOCK_MATCHES);
+    // ── Fallback: Mock data (always returns something) ──
+    if (!matches.length) {
+      console.log('Using mock match data as fallback');
+      return res.json(MOCK_MATCHES);
+    }
 
-    cache.matches  = matches;
+    cache.matches   = matches;
     cache.matchesAt = now;
     res.json(matches);
   } catch (err) {
-    console.error('Matches error:', err.message);
-    res.json(MOCK_MATCHES);
+    console.error('Matches route error:', err.message);
+    res.json(MOCK_MATCHES); // guaranteed fallback
   }
 });
 
