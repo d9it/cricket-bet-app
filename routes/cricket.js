@@ -134,13 +134,21 @@ function parseCricbuzzMatches(data) {
         try {
           const info  = match.matchInfo  || {};
           const score = match.matchScore || {};
-          const fmt   = (info.matchFormat || 'T20').toLowerCase();
-          if (!['t20','odi','test'].includes(fmt)) continue;
+
+          // Normalize matchFormat: T20I → t20, WODI → odi, TEST → test, etc.
+          const rawFmt = (info.matchFormat || '').toUpperCase();
+          let fmt;
+          if (rawFmt.includes('T20') || rawFmt.includes('TWENTY20')) fmt = 't20';
+          else if (rawFmt.includes('ODI') || rawFmt.includes('ONE DAY') || rawFmt.includes('ONEDAY')) fmt = 'odi';
+          else if (rawFmt.includes('TEST') || rawFmt.includes('FIRSTCLASS') || rawFmt.includes('FIRST CLASS')) fmt = 'test';
+          else continue; // skip practice, tour, U19, etc.
 
           const status = info.status || 'Upcoming';
           const isLive = status.toLowerCase().includes('live') ||
                          status.toLowerCase().includes('innings') ||
-                         status.toLowerCase().includes('day');
+                         status.toLowerCase().includes('day') ||
+                         status.toLowerCase().includes('session') ||
+                         status.toLowerCase().includes('over');
 
           let scoreStr = '';
           if (score.team1Score?.inngs1) {
