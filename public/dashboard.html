@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CricketBet — Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<!-- HERO / WALLET -->
+<div class="dash-hero">
+  <div class="container">
+    <h1>Welcome back, <span id="hero-name">Player</span>! 👋</h1>
+    <p class="text-muted">Pick your players. Win big. 🏏</p>
+
+    <div class="wallet-display">
+      <div class="wallet-icon">💰</div>
+      <div>
+        <div class="wallet-label">Your Wallet</div>
+        <div class="wallet-amount" id="wallet-amount">—</div>
+      </div>
+    </div>
+
+    <div class="dash-actions mt-4">
+      <div class="action-card" onclick="showCreate()">
+        <div class="icon">🎮</div>
+        <h3>Create Game</h3>
+        <p>Start a new betting room and invite friends</p>
+      </div>
+      <div class="action-card" onclick="showJoin()">
+        <div class="icon">🔗</div>
+        <h3>Join Game</h3>
+        <p>Enter a room code to join a friend's game</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="container">
+
+  <!-- ACTIVE GAMES -->
+  <section>
+    <h2>🟢 Active Games</h2>
+    <div id="active-games">
+      <div class="loading"><div class="spinner"></div>Loading…</div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- GAME HISTORY -->
+  <section>
+    <h2>📋 Game History</h2>
+    <div id="history-games">
+      <div class="loading"><div class="spinner"></div>Loading…</div>
+    </div>
+  </section>
+
+</div>
+
+<!-- CREATE GAME MODAL -->
+<div class="modal-overlay hidden" id="create-modal">
+  <div class="modal">
+    <h3>🎮 Create New Game</h3>
+    <div id="create-alert"></div>
+
+    <div class="form-group">
+      <label class="form-label">Match Format</label>
+      <select class="form-control" id="c-format">
+        <option value="t20">T20</option>
+        <option value="odi">ODI</option>
+        <option value="test">Test</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Select Live Match <span style="color:var(--text2)">(optional)</span></label>
+      <div id="match-list">
+        <div class="loading" style="padding:16px"><div class="spinner"></div>Fetching matches…</div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Team A Name</label>
+        <input type="text" id="c-team-a" class="form-control" placeholder="Team A" maxlength="30" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Team B Name</label>
+        <input type="text" id="c-team-b" class="form-control" placeholder="Team B" maxlength="30" />
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Bet Amount (points)</label>
+        <select class="form-control" id="c-bet">
+          <option value="100">100</option>
+          <option value="250">250</option>
+          <option value="500">500</option>
+          <option value="1000">1,000</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Max Players</label>
+        <select class="form-control" id="c-max-players">
+          <option value="2">2 Players</option>
+          <option value="3">3 Players</option>
+          <option value="4">4 Players</option>
+          <option value="5" selected>5 Players</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group hidden" id="custom-bet-group">
+      <label class="form-label">Custom Amount</label>
+      <input type="number" id="c-bet-custom" class="form-control" placeholder="Enter points" min="10" />
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="hideCreate()">Cancel</button>
+      <button class="btn btn-primary" onclick="createGame()" id="create-btn">Create Game 🏏</button>
+    </div>
+  </div>
+</div>
+
+<!-- JOIN GAME MODAL -->
+<div class="modal-overlay hidden" id="join-modal">
+  <div class="modal">
+    <h3>🔗 Join a Game</h3>
+    <div id="join-alert"></div>
+    <div class="form-group">
+      <label class="form-label">Room Code</label>
+      <input type="text" id="j-code" class="form-control" placeholder="E.g. CRICK7" maxlength="6"
+             style="font-size:1.4rem;letter-spacing:0.15em;text-transform:uppercase;text-align:center;font-weight:700" />
+      <p class="form-hint">Ask the game host for their 6-character room code</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="hideJoin()">Cancel</button>
+      <button class="btn btn-primary" onclick="joinGame()" id="join-btn">Join Game</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+if (!requireAuth()) throw new Error('not authed');
+
+const user = getUser();
+let selectedMatchId = null;
+
+// Populate page
+document.getElementById('hero-name').textContent = user.username;
+document.getElementById('wallet-amount').textContent = formatPoints(user.wallet_balance);
+
+// Refresh wallet
+apiFetch('/auth/me').then(d => {
+  document.getElementById('wallet-amount').textContent = formatPoints(d.wallet_balance);
+  const u = getUser(); u.wallet_balance = d.wallet_balance; localStorage.setItem('cb_user', JSON.stringify(u));
+}).catch(() => {});
+
+// Load game history
+async function loadGames() {
+  try {
+    const games = await apiFetch('/games/my-games');
+    const active = games.filter(g => g.status !== 'finished');
+    const history = games.filter(g => g.status === 'finished');
+    renderActive(active);
+    renderHistory(history);
+  } catch (e) {
+    document.getElementById('active-games').innerHTML = `<div class="alert alert-error">${escHtml(e.message)}</div>`;
+  }
+}
+
+function renderActive(games) {
+  const el = document.getElementById('active-games');
+  if (!games.length) {
+    el.innerHTML = `<p class="text-muted" style="padding:12px">No active games. Create one or join a friend!</p>`;
+    return;
+  }
+  el.innerHTML = games.map(g => {
+    const href = g.status === 'live' ? `/scoreboard.html?game=${g.id}` : `/lobby.html?game=${g.id}`;
+    return `
+    <div class="game-item" style="cursor:pointer" onclick="location.href='${href}'">
+      <div>
+        <div class="game-teams">${escHtml(g.team_a_name)} vs ${escHtml(g.team_b_name)}</div>
+        <div class="game-meta mt-2">${formatBadge(g.format)} &nbsp;${g.player_count} player(s) &nbsp;• Bet: <strong>${formatPoints(g.bet_amount)}</strong> &nbsp;• Room: <code style="color:var(--gold)">${g.room_code}</code></div>
+      </div>
+      <div style="text-align:right">
+        <span class="badge ${g.status === 'live' ? 'badge-live' : 'badge-info'}" style="${g.status==='live'?'':'background:rgba(59,130,246,0.2);color:#93c5fd'}">${g.status.toUpperCase()}</span>
+        <div style="font-size:0.8rem;color:var(--text2);margin-top:4px">→ Open</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderHistory(games) {
+  const el = document.getElementById('history-games');
+  if (!games.length) {
+    el.innerHTML = `<p class="text-muted" style="padding:12px">No finished games yet.</p>`;
+    return;
+  }
+  el.innerHTML = games.map(g => {
+    const won = g.winner_id === user.id;
+    return `
+    <div class="game-item">
+      <div>
+        <div class="game-teams">${escHtml(g.team_a_name)} vs ${escHtml(g.team_b_name)}</div>
+        <div class="game-meta mt-2">${formatBadge(g.format)} &nbsp;${g.player_count} player(s) &nbsp;• Bet: ${formatPoints(g.bet_amount)}</div>
+        ${g.winner_username ? `<div class="game-meta mt-2">🏆 Winner: <strong>${escHtml(g.winner_username)}</strong></div>` : ''}
+      </div>
+      <div style="text-align:right">
+        <span class="badge ${won ? 'badge-win' : 'badge-done'}">${won ? '🏆 WON' : 'LOST'}</span>
+        <div class="game-runs mt-2">${g.total_runs} runs</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Create Game ──────────────────────────
+function showCreate() {
+  document.getElementById('create-modal').classList.remove('hidden');
+  loadMatches();
+}
+function hideCreate() {
+  document.getElementById('create-modal').classList.add('hidden');
+  selectedMatchId = null;
+}
+
+document.getElementById('c-bet').addEventListener('change', function() {
+  document.getElementById('custom-bet-group').classList.toggle('hidden', this.value !== 'custom');
+});
+
+async function loadMatches() {
+  const el = document.getElementById('match-list');
+  try {
+    const matches = await apiFetch('/cricket/matches');
+    if (!matches.length) { el.innerHTML = '<p class="text-muted" style="font-size:0.85rem">No matches available</p>'; return; }
+    el.innerHTML = matches.map(m => `
+      <div class="match-card" id="match-${m.id}" onclick="selectMatch('${m.id}','${escHtml(m.teams[0]||'')}','${escHtml(m.teams[1]||'')}','${m.matchType}')">
+        <h4>${escHtml(m.name)}</h4>
+        <p>${formatBadge(m.matchType)} &nbsp; ${escHtml(m.status)} &nbsp;• ${escHtml(m.venue || '')}</p>
+      </div>
+    `).join('');
+  } catch {
+    el.innerHTML = '<p class="text-muted" style="font-size:0.85rem">Could not load matches</p>';
+  }
+}
+
+function selectMatch(id, teamA, teamB, fmt) {
+  selectedMatchId = id;
+  document.querySelectorAll('.match-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('match-'+id)?.classList.add('selected');
+  document.getElementById('c-team-a').value = teamA;
+  document.getElementById('c-team-b').value = teamB;
+  document.getElementById('c-format').value = fmt;
+}
+
+async function createGame() {
+  const btn = document.getElementById('create-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  clearAlert('create-alert');
+  try {
+    const betSel = document.getElementById('c-bet').value;
+    const bet = betSel === 'custom'
+      ? parseInt(document.getElementById('c-bet-custom').value)
+      : parseInt(betSel);
+    const data = await apiFetch('/games/create', {
+      method: 'POST',
+      body: JSON.stringify({
+        format: document.getElementById('c-format').value,
+        matchId: selectedMatchId,
+        teamAName: document.getElementById('c-team-a').value || 'Team A',
+        teamBName: document.getElementById('c-team-b').value || 'Team B',
+        betAmount: bet,
+        maxPlayers: document.getElementById('c-max-players').value
+      })
+    });
+    hideCreate();
+    window.location.href = `/lobby.html?game=${data.gameId}`;
+  } catch (err) {
+    showAlert('create-alert', err.message);
+    btn.disabled = false; btn.textContent = 'Create Game 🏏';
+  }
+}
+
+// ── Join Game ──────────────────────────
+function showJoin() { document.getElementById('join-modal').classList.remove('hidden'); }
+function hideJoin()  { document.getElementById('join-modal').classList.add('hidden'); }
+
+document.getElementById('j-code').addEventListener('input', function() {
+  this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+});
+
+async function joinGame() {
+  const btn = document.getElementById('join-btn');
+  btn.disabled = true; btn.textContent = 'Joining…';
+  clearAlert('join-alert');
+  try {
+    const data = await apiFetch('/games/join', {
+      method: 'POST',
+      body: JSON.stringify({ roomCode: document.getElementById('j-code').value })
+    });
+    hideJoin();
+    window.location.href = `/lobby.html?game=${data.gameId}`;
+  } catch (err) {
+    showAlert('join-alert', err.message);
+    btn.disabled = false; btn.textContent = 'Join Game';
+  }
+}
+
+loadGames();
+</script>
+</body>
+</html>

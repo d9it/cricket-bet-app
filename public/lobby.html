@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CricketBet — Game Lobby</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+<div id="navbar"></div>
+
+<div class="container" style="padding-top:24px; padding-bottom:40px; max-width:680px;">
+
+  <div id="alert-box"></div>
+  <div id="page-loading" class="loading"><div class="spinner"></div>Loading lobby…</div>
+
+  <div id="lobby-content" class="hidden">
+
+    <!-- WAITING PHASE -->
+    <div id="phase-waiting">
+      <div class="card mb-3">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+          <div>
+            <div id="match-title" style="font-size:1.1rem;font-weight:700"></div>
+            <div id="match-meta" style="color:var(--text2);font-size:0.85rem;margin-top:4px"></div>
+          </div>
+          <div id="format-badge"></div>
+        </div>
+
+        <hr class="divider" />
+
+        <div class="card-title">🔑 Room Code — Share with friends!</div>
+        <div class="room-code-display" id="room-code">——</div>
+        <button class="btn btn-outline btn-full mt-2" onclick="copyRoomCode()">📋 Copy Room Code</button>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-title">👥 Players (<span id="player-count">0</span> / <span id="max-players">5</span>)</div>
+        <p class="text-muted mb-3" style="font-size:0.85rem">Waiting for players to join. You need at least 2 to start.</p>
+        <div class="player-list" id="player-list">
+          <div class="loading"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">💰 Bet Details</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div style="text-align:center;background:var(--bg3);border-radius:8px;padding:14px">
+            <div style="color:var(--text2);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em">Bet Per Player</div>
+            <div style="font-size:1.5rem;font-weight:800;color:var(--gold)" id="bet-amount">—</div>
+          </div>
+          <div style="text-align:center;background:var(--bg3);border-radius:8px;padding:14px">
+            <div style="color:var(--text2);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em">Total Pot</div>
+            <div style="font-size:1.5rem;font-weight:800;color:var(--gold)" id="total-pot">—</div>
+          </div>
+        </div>
+        <div id="host-controls" class="hidden mt-3">
+          <button class="btn btn-primary btn-full btn-lg" id="start-btn" onclick="startGame()">Start Game 🏏</button>
+          <p class="text-muted text-center mt-2" style="font-size:0.82rem">Only you (the host) can start the game</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SELECTION PHASE -->
+    <div id="phase-selecting" class="hidden">
+      <div class="card mb-3">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:0.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em">Select Your Players</div>
+            <div style="font-size:1.1rem;font-weight:700;margin-top:2px"><span id="sel-team-a">Team A</span> vs <span id="sel-team-b">Team B</span></div>
+          </div>
+          <span id="sel-format-badge"></span>
+        </div>
+      </div>
+
+      <div id="already-ready-banner" class="hidden">
+        <div class="alert alert-success">✅ You've submitted your picks! Waiting for other players…</div>
+        <div id="ready-status-list"></div>
+      </div>
+
+      <div id="selection-ui">
+        <div class="card mb-3">
+          <div class="card-title">🎯 Your Pick Budget</div>
+          <div class="picks-counter">
+            <div class="count"><span id="picks-used">0</span> / <span id="picks-total">5</span></div>
+            <div style="color:var(--text2);font-size:0.85rem">positions selected</div>
+          </div>
+          <div id="taken-notice" class="alert alert-info hidden" style="font-size:0.85rem">Some positions are already taken by other players and are shown in grey.</div>
+        </div>
+
+        <div class="team-grid">
+          <div class="team-section team-a">
+            <div class="team-header">🔵 <span id="team-a-label">Team A</span><br><small style="font-weight:400;opacity:0.8">Batting Positions 1–5</small></div>
+            <div id="team-a-positions"></div>
+          </div>
+          <div class="team-section team-b">
+            <div class="team-header">🟣 <span id="team-b-label">Team B</span><br><small style="font-weight:400;opacity:0.8">Batting Positions 1–5</small></div>
+            <div id="team-b-positions"></div>
+          </div>
+        </div>
+
+        <div class="card mt-3">
+          <div id="selection-alert"></div>
+          <button class="btn btn-primary btn-full btn-lg" id="submit-picks-btn" onclick="submitPicks()" disabled>
+            Submit Picks
+          </button>
+          <p class="text-center mt-2 text-muted" style="font-size:0.82rem">Select exactly <strong id="picks-required">5</strong> positions, then hit Submit</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+if (!requireAuth()) throw new Error('not authed');
+
+const params = new URLSearchParams(location.search);
+const gameId = params.get('game');
+if (!gameId) location.href = '/dashboard.html';
+
+const user = getUser();
+let lobbyData = null;
+let selectedPositions = [];
+let pollInterval = null;
+
+async function loadLobby() {
+  try {
+    lobbyData = await apiFetch(`/games/${gameId}/lobby`);
+    const { game, participants, currentUserId, takenPositions, pickAllocation } = lobbyData;
+
+    document.getElementById('page-loading').classList.add('hidden');
+    document.getElementById('lobby-content').classList.remove('hidden');
+
+    // Redirect if live
+    if (game.status === 'live' || game.status === 'finished') {
+      window.location.href = `/scoreboard.html?game=${gameId}`;
+      return;
+    }
+
+    if (game.status === 'waiting') {
+      renderWaiting(game, participants, currentUserId);
+    } else if (game.status === 'selecting') {
+      renderSelecting(game, participants, currentUserId, takenPositions, pickAllocation);
+    }
+  } catch (err) {
+    document.getElementById('page-loading').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderWaiting(game, participants, currentUserId) {
+  document.getElementById('phase-waiting').classList.remove('hidden');
+  document.getElementById('phase-selecting').classList.add('hidden');
+
+  document.getElementById('match-title').textContent = `${game.teamAName} vs ${game.teamBName}`;
+  document.getElementById('match-meta').textContent = `Bet: ${formatPoints(game.betAmount)} per player`;
+  document.getElementById('format-badge').innerHTML = formatBadge(game.format);
+  document.getElementById('room-code').textContent = game.roomCode;
+  document.getElementById('player-count').textContent = participants.length;
+  document.getElementById('max-players').textContent = game.maxPlayers;
+  document.getElementById('bet-amount').textContent = formatPoints(game.betAmount);
+  document.getElementById('total-pot').textContent = formatPoints(game.betAmount * participants.length) + ' +';
+
+  const listEl = document.getElementById('player-list');
+  const slots = [];
+  for (let i = 0; i < game.maxPlayers; i++) {
+    const p = participants[i];
+    if (p) {
+      const isYou = p.userId === currentUserId;
+      slots.push(`
+        <div class="player-slot filled ${isYou ? 'you' : ''}">
+          <div class="player-avatar">${p.username[0].toUpperCase()}</div>
+          <div>
+            <div class="player-name">${escHtml(p.username)}${isYou ? ' <small>(You)</small>' : ''}</div>
+            <small style="color:var(--text2)">Joined #${p.joinOrder}</small>
+          </div>
+          ${i === 0 ? '<span class="badge badge-live" style="margin-left:auto">HOST</span>' : ''}
+        </div>`);
+    } else {
+      slots.push(`<div class="player-slot empty">
+        <div class="player-avatar" style="background:var(--bg3);color:var(--text2)">?</div>
+        <div class="player-name" style="color:var(--text2)">Waiting for player…</div>
+      </div>`);
+    }
+  }
+  listEl.innerHTML = slots.join('');
+
+  const isHost = game.createdBy === currentUserId;
+  const hostCtrl = document.getElementById('host-controls');
+  if (isHost) {
+    hostCtrl.classList.remove('hidden');
+    document.getElementById('start-btn').disabled = participants.length < 2;
+  }
+}
+
+function renderSelecting(game, participants, currentUserId, takenPositions, pickAllocation) {
+  document.getElementById('phase-waiting').classList.add('hidden');
+  document.getElementById('phase-selecting').classList.remove('hidden');
+
+  document.getElementById('sel-team-a').textContent = game.teamAName;
+  document.getElementById('sel-team-b').textContent = game.teamBName;
+  document.getElementById('sel-format-badge').innerHTML = formatBadge(game.format);
+  document.getElementById('team-a-label').textContent = game.teamAName;
+  document.getElementById('team-b-label').textContent = game.teamBName;
+
+  const myIdx = participants.findIndex(p => p.userId === currentUserId);
+  const myAllocation = pickAllocation[myIdx] ?? 0;
+  const myRecord = participants[myIdx];
+
+  document.getElementById('picks-total').textContent = myAllocation;
+  document.getElementById('picks-required').textContent = myAllocation;
+
+  // Show ready status
+  const statusList = document.getElementById('ready-status-list');
+  statusList.innerHTML = `
+    <div class="card card-sm">
+      <div class="card-title">Player Readiness</div>
+      ${participants.map(p => `
+        <div class="player-slot ${p.isReady ? 'filled' : 'empty'}" style="margin-bottom:8px">
+          <div class="player-avatar" style="${p.isReady ? '' : 'background:var(--bg3);color:var(--text2)'}">${p.username[0].toUpperCase()}</div>
+          <div class="player-name">${escHtml(p.username)}${p.userId === currentUserId ? ' (You)' : ''}</div>
+          <span style="margin-left:auto">${p.isReady ? '✅ Ready' : '⏳ Selecting…'}</span>
+        </div>`).join('')}
+    </div>`;
+
+  if (myRecord && myRecord.isReady) {
+    document.getElementById('already-ready-banner').classList.remove('hidden');
+    document.getElementById('selection-ui').classList.add('hidden');
+    return;
+  }
+
+  // Build position buttons
+  const takenKeys = (takenPositions || []).map(t => `${t.team}${t.position}`);
+  if (takenKeys.length) document.getElementById('taken-notice').classList.remove('hidden');
+
+  ['A','B'].forEach(team => {
+    const container = document.getElementById(`team-${team === 'A' ? 'a' : 'b'}-positions`);
+    container.innerHTML = '';
+    for (let pos = 1; pos <= 5; pos++) {
+      const key = `${team}${pos}`;
+      const isTaken = takenKeys.includes(key);
+      const btn = document.createElement('button');
+      btn.className = `pos-btn ${isTaken ? 'taken' : ''}`;
+      btn.disabled = isTaken;
+      btn.id = `pos-${key}`;
+      btn.dataset.team = team;
+      btn.dataset.pos = pos;
+      btn.innerHTML = `
+        <div class="pos-number">${pos}</div>
+        <div>
+          <div>${pos === 1 ? '1st' : pos === 2 ? '2nd' : pos === 3 ? '3rd' : pos + 'th'} Batsman</div>
+          <div style="font-size:0.75rem;color:var(--text2)">${isTaken ? 'Already taken' : 'Batting order #' + pos}</div>
+        </div>`;
+      if (!isTaken) btn.onclick = () => togglePosition(team, pos, myAllocation);
+      container.appendChild(btn);
+    }
+  });
+}
+
+function togglePosition(team, pos, maxPicks) {
+  const key = `${team}${pos}`;
+  const idx = selectedPositions.findIndex(p => p.team === team && p.position === pos);
+  if (idx >= 0) {
+    selectedPositions.splice(idx, 1);
+    document.getElementById(`pos-${key}`).classList.remove('selected');
+  } else {
+    if (selectedPositions.length >= maxPicks) {
+      showAlert('selection-alert', `You can only pick ${maxPicks} position(s). Deselect one first.`, 'error');
+      return;
+    }
+    selectedPositions.push({ team, position: pos });
+    document.getElementById(`pos-${key}`).classList.add('selected');
+  }
+  clearAlert('selection-alert');
+  document.getElementById('picks-used').textContent = selectedPositions.length;
+  document.getElementById('submit-picks-btn').disabled = selectedPositions.length !== maxPicks;
+}
+
+async function startGame() {
+  const btn = document.getElementById('start-btn');
+  btn.disabled = true; btn.textContent = 'Starting…';
+  try {
+    await apiFetch(`/games/${gameId}/start`, { method: 'POST' });
+    loadLobby();
+  } catch (err) {
+    showAlert('alert-box', err.message);
+    btn.disabled = false; btn.textContent = 'Start Game 🏏';
+  }
+}
+
+async function submitPicks() {
+  const btn = document.getElementById('submit-picks-btn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  clearAlert('selection-alert');
+  try {
+    const res = await apiFetch(`/games/${gameId}/select-positions`, {
+      method: 'POST',
+      body: JSON.stringify({ positions: selectedPositions })
+    });
+    if (res.allReady) {
+      window.location.href = `/scoreboard.html?game=${gameId}`;
+    } else {
+      showAlert('selection-alert', `Picks saved! Waiting for ${res.total - res.readyCount} more player(s)…`, 'success');
+      loadLobby(); // Refresh to show ready state
+    }
+  } catch (err) {
+    showAlert('selection-alert', err.message);
+    btn.disabled = false; btn.textContent = 'Submit Picks';
+  }
+}
+
+function copyRoomCode() {
+  const code = document.getElementById('room-code').textContent.trim();
+  copyToClipboard(code);
+  const btn = event.target;
+  btn.textContent = '✅ Copied!';
+  setTimeout(() => btn.textContent = '📋 Copy Room Code', 2000);
+}
+
+// Poll every 4 seconds for lobby updates
+loadLobby();
+pollInterval = setInterval(loadLobby, 4000);
+window.addEventListener('beforeunload', () => clearInterval(pollInterval));
+</script>
+</body>
+</html>
