@@ -233,19 +233,30 @@
 <script>
 if (!requireAuth()) throw new Error('not authed');
 
-const user = getUser();
+// null-safe: if user data is missing from storage, re-fetch from server
+let user = getUser();
+if (!user) {
+  // Token exists but user object is missing — re-fetch and reload
+  apiFetch('/auth/me').then(d => {
+    const u = { id: d.id, username: d.username, email: d.email, wallet_balance: d.wallet_balance };
+    localStorage.setItem('cb_user', JSON.stringify(u));
+    location.reload();
+  }).catch(() => { clearAuth(); location.href = '/'; });
+  throw new Error('reloading user data');
+}
+
 let selectedMatchId = null;
 let allMatches = [];
 let currentFilter = 'all';
 
 // Populate page
-document.getElementById('hero-name').textContent = user.username;
-document.getElementById('wallet-amount').textContent = formatPoints(user.wallet_balance);
+document.getElementById('hero-name').textContent = user.username || 'Player';
+document.getElementById('wallet-amount').textContent = formatPoints(user.wallet_balance || 0);
 
 // Refresh wallet
 apiFetch('/auth/me').then(d => {
   document.getElementById('wallet-amount').textContent = formatPoints(d.wallet_balance);
-  const u = getUser(); u.wallet_balance = d.wallet_balance; localStorage.setItem('cb_user', JSON.stringify(u));
+  const u = getUser() || user; u.wallet_balance = d.wallet_balance; localStorage.setItem('cb_user', JSON.stringify(u));
 }).catch(() => {});
 
 // ── Dashboard Match Cards ─────────────────
@@ -254,10 +265,18 @@ async function loadDashboardMatches(forceRefresh = false) {
   if (!forceRefresh && allMatches.length) { renderDashboardMatches(allMatches); return; }
   el.innerHTML = '<div class="loading"><div class="spinner"></div>Fetching matches…</div>';
   try {
-    allMatches = await apiFetch('/cricket/matches');
+    const result = await apiFetch('/cricket/matches');
+    allMatches = Array.isArray(result) ? result : [];
+    if (!allMatches.length) {
+      el.innerHTML = '<p class="text-muted" style="padding:12px">No matches available right now. Try refreshing.</p>';
+      return;
+    }
     renderDashboardMatches(allMatches);
-  } catch {
-    el.innerHTML = '<p class="text-muted" style="padding:12px">Could not load matches.</p>';
+  } catch (err) {
+    el.innerHTML = `<div style="padding:12px">
+      <p class="text-muted">Could not load matches — <strong>${escHtml(err.message)}</strong></p>
+      <button class="btn btn-outline btn-sm mt-2" onclick="loadDashboardMatches(true)">🔄 Retry</button>
+    </div>`;
   }
 }
 
