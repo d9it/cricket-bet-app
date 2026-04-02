@@ -5,6 +5,47 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CricketBet — Live Scoreboard</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    /* ── Lock Banner ── */
+    .lock-banner {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-radius: 10px; margin-bottom: 20px;
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+      font-size: 0.88rem; color: #fca5a5;
+    }
+    .lock-banner .lock-icon { font-size: 1.2rem; flex-shrink: 0; }
+
+    /* ── Awaiting start notice ── */
+    .awaiting-banner {
+      text-align: center; padding: 24px; border-radius: var(--radius);
+      background: var(--bg3); border: 1px dashed var(--border); margin-bottom: 20px;
+    }
+    .awaiting-banner .aw-icon { font-size: 2rem; margin-bottom: 8px; }
+
+    /* ── Score card improvements ── */
+    .score-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+    .score-card.leading { border-color: var(--gold); box-shadow: 0 0 20px rgba(245,197,24,0.15); }
+    .score-card-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; background: var(--bg3); border-bottom: 1px solid var(--border); }
+    .score-card-body { padding: 10px 14px; }
+
+    .pick-row { padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .pick-row:last-child { border-bottom: none; }
+
+    .pick-top { display: flex; justify-content: space-between; align-items: center; }
+    .pick-left { display: flex; align-items: center; gap: 7px; }
+    .pick-player-name { font-weight: 600; font-size: 0.88rem; margin-top: 3px; color: var(--text); padding-left: 2px; }
+    .pick-status { font-size: 0.72rem; color: var(--text2); margin-top: 2px; padding-left: 2px; }
+    .pick-runs-big { font-size: 1.3rem; font-weight: 800; color: var(--gold); line-height: 1; }
+    .pick-runs-big small { font-size: 0.7rem; font-weight: 400; color: var(--text2); }
+    .pick-runs-pending { font-size: 0.85rem; color: var(--text2); font-style: italic; }
+
+    /* Highlight own card */
+    .score-card.my-card .score-card-header { background: rgba(26,122,60,0.12); }
+
+    /* Scorecard table highlights */
+    .sc-row-picked { background: rgba(245,197,24,0.06); }
+    .sc-row-picked td:first-child { border-left: 3px solid var(--gold); }
+  </style>
 </head>
 <body>
 
@@ -17,7 +58,7 @@
 
   <div id="scoreboard-content" class="hidden">
 
-    <!-- WINNER BANNER (shown when finished) -->
+    <!-- WINNER BANNER -->
     <div id="winner-banner" class="hidden winner-banner mb-3">
       <div class="trophy">🏆</div>
       <h2 id="winner-text">Winner!</h2>
@@ -27,32 +68,38 @@
       </div>
     </div>
 
-    <!-- MATCH INFO -->
+    <!-- LOCK NOTICE (shown once live) -->
+    <div id="lock-banner" class="lock-banner hidden">
+      <span class="lock-icon">🔒</span>
+      <div>
+        <strong>Picks are locked</strong> — The match has started. No changes can be made to player selections.
+      </div>
+    </div>
+
+    <!-- AWAITING START NOTICE -->
+    <div id="awaiting-banner" class="awaiting-banner hidden">
+      <div class="aw-icon">⏳</div>
+      <div style="font-weight:700;font-size:1rem">Waiting for match to begin</div>
+      <p class="text-muted mt-2" style="font-size:0.85rem">Picks are locked. Scores will appear here as soon as play starts.</p>
+    </div>
+
+    <!-- MATCH INFO HEADER -->
     <div class="score-header mb-3">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div>
-          <div style="font-size:0.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em" id="sb-format-label"></div>
+          <div style="font-size:0.78rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em" id="sb-format-label"></div>
           <h1 id="sb-match-name" style="font-size:1.3rem;font-weight:700;margin-top:2px">Loading…</h1>
         </div>
         <div id="sb-live-badge"></div>
       </div>
       <div style="display:flex;gap:20px;margin-top:12px;flex-wrap:wrap">
-        <div>
-          <span style="color:var(--text2);font-size:0.8rem">Bet per player:</span>
-          <strong id="sb-bet" style="color:var(--gold)"></strong>
-        </div>
-        <div>
-          <span style="color:var(--text2);font-size:0.8rem">Total pot:</span>
-          <strong id="sb-pot" style="color:var(--gold)"></strong>
-        </div>
-        <div>
-          <span style="color:var(--text2);font-size:0.8rem">Room:</span>
-          <strong id="sb-room" style="color:var(--white)"></strong>
-        </div>
+        <div><span style="color:var(--text2);font-size:0.8rem">Bet per player:</span> <strong id="sb-bet" style="color:var(--gold)"></strong></div>
+        <div><span style="color:var(--text2);font-size:0.8rem">Total pot:</span> <strong id="sb-pot" style="color:var(--gold)"></strong></div>
+        <div><span style="color:var(--text2);font-size:0.8rem">Room:</span> <strong id="sb-room" style="color:var(--white)"></strong></div>
       </div>
     </div>
 
-    <!-- SCORECARDS GRID -->
+    <!-- PLAYER SCORE CARDS -->
     <section>
       <h2 id="sb-section-title">🏏 Live Player Scores</h2>
       <div class="scoreboard-grid" id="scoreboard-grid"></div>
@@ -64,9 +111,10 @@
       <div class="leaderboard" id="leaderboard"></div>
     </section>
 
-    <!-- DETAILED SCORECARD -->
+    <!-- FULL MATCH SCORECARD -->
     <section>
-      <h2>📊 Match Scorecard</h2>
+      <h2>📊 Full Match Scorecard</h2>
+      <p class="text-muted mb-3" style="font-size:0.85rem">⭐ Highlighted rows = positions picked by a player in this game</p>
       <div id="match-scorecard">
         <div class="loading" style="padding:20px"><div class="spinner"></div>Fetching live data…</div>
       </div>
@@ -76,8 +124,8 @@
     <div id="host-controls" class="hidden" style="margin-top:24px">
       <div class="card text-center">
         <div class="card-title">⚙️ Host Controls</div>
-        <p class="text-muted mb-3" style="font-size:0.85rem">End the game manually when the match is over</p>
-        <button class="btn btn-danger" onclick="finalizeGame()">🏁 End Game & Declare Winner</button>
+        <p class="text-muted mb-3" style="font-size:0.85rem">End the game manually once the match is over</p>
+        <button class="btn btn-danger" onclick="finalizeGame()">🏁 End Game &amp; Declare Winner</button>
       </div>
     </div>
 
@@ -90,86 +138,131 @@
 <script>
 if (!requireAuth()) throw new Error('not authed');
 
-const params = new URLSearchParams(location.search);
-const gameId = params.get('game');
+const params  = new URLSearchParams(location.search);
+const gameId  = params.get('game');
 if (!gameId) location.href = '/dashboard.html';
 
 const user = getUser();
-let pollInterval = null;
-let scorecard = null;
-let gameData = null;
+let pollInterval  = null;
+let scorecard     = null;   // latest scorecard from API
+let matchStarted  = false;  // true once any batsman has runs/started
 
+// ── Main load ────────────────────────────────────────────────────────────────
 async function loadScoreboard() {
   try {
-    gameData = await apiFetch(`/games/${gameId}/scores`);
-    const { game, participants, currentUserId } = gameData;
+    const data = await apiFetch(`/games/${gameId}/scores`);
+    const { game, participants, currentUserId, result } = data;
 
     document.getElementById('page-loading').classList.add('hidden');
     document.getElementById('scoreboard-content').classList.remove('hidden');
 
-    // Redirect to lobby if still in selection phase
+    // Redirect back to lobby if draft not done
     if (game.status === 'selecting' || game.status === 'waiting') {
+      clearInterval(pollInterval);
       window.location.href = `/lobby.html?game=${gameId}`;
       return;
     }
 
     renderHeader(game, participants);
-    renderScoreboards(game, participants);
-    renderLeaderboard(participants);
+    showLockBanner(game.status);
 
     if (game.status === 'live') {
-      fetchAndUpdateScores(game);
-    }
-
-    if (game.status === 'finished') {
+      fetchAndUpdateScores(game, participants, currentUserId);
+    } else {
+      // finished — render final state immediately
+      renderScoreboards(game, participants);
+      renderLeaderboard(participants);
       showWinnerBanner(game, participants, currentUserId);
+      clearInterval(pollInterval);
     }
 
-    // Host controls
+    // Show host "End Game" button
     if (game.createdBy === currentUserId && game.status === 'live') {
-      // We need createdBy from lobby — approximate check
+      document.getElementById('host-controls').classList.remove('hidden');
     }
 
   } catch (err) {
-    document.getElementById('page-loading').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
+    document.getElementById('page-loading').innerHTML =
+      `<div class="alert alert-error">${escHtml(err.message)}</div>`;
   }
 }
 
-async function fetchAndUpdateScores(game) {
-  if (!game.matchId) { renderMockScorecard(); return; }
+// ── Lock banner ───────────────────────────────────────────────────────────────
+function showLockBanner(status) {
+  if (status === 'live' || status === 'finished') {
+    document.getElementById('lock-banner').classList.remove('hidden');
+  }
+}
+
+// ── Fetch live cricket scores ─────────────────────────────────────────────────
+async function fetchAndUpdateScores(game, participants, currentUserId) {
+  // No match ID → mock mode
+  if (!game.matchId) {
+    renderScoreboards(game, participants);
+    renderLeaderboard(participants);
+    renderMockScorecard();
+    return;
+  }
+
   try {
     scorecard = await apiFetch(`/cricket/scorecard/${game.matchId}`);
-    renderMatchScorecard(scorecard, game);
+    renderMatchScorecard(scorecard, game, participants);
 
-    // Push scores to server
+    // Check if play has actually begun
+    matchStarted = scorecard?.teams?.some(team =>
+      team.batsmen?.some(b =>
+        b.runs > 0 ||
+        b.status === 'batting' ||
+        (b.status || '').toLowerCase().includes('out')
+      )
+    ) || false;
+
+    if (!matchStarted) {
+      // Picks locked but match hasn't started — show waiting notice
+      document.getElementById('awaiting-banner').classList.remove('hidden');
+      document.getElementById('sb-live-badge').innerHTML =
+        '<span style="color:var(--text2);font-size:0.85rem">⏳ Awaiting start</span>';
+      renderScoreboards(game, participants); // shows — dashes
+      renderLeaderboard(participants);
+      document.getElementById('last-updated').textContent = '⏳ Waiting for match to begin…';
+      return;
+    }
+
+    // Match is live — hide awaiting notice
+    document.getElementById('awaiting-banner').classList.add('hidden');
+
+    // Send scores to server
     const updated = await apiFetch(`/games/${gameId}/update-scores`, {
       method: 'POST',
       body: JSON.stringify({ scorecard })
     });
 
     if (updated.isFinished) {
-      showWinnerBannerFromResult(updated);
       clearInterval(pollInterval);
+      loadScoreboard(); // reload in finished state
       return;
     }
 
-    // Re-render scoreboards with updated runs
-    const updatedGame = await apiFetch(`/games/${gameId}/scores`);
-    renderScoreboards(updatedGame.game, updatedGame.participants);
-    renderLeaderboard(updatedGame.participants);
+    // Re-fetch scores and re-render
+    const fresh = await apiFetch(`/games/${gameId}/scores`);
+    renderScoreboards(fresh.game, fresh.participants);
+    renderLeaderboard(fresh.participants);
 
-    document.getElementById('last-updated').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+    document.getElementById('last-updated').textContent =
+      `🔄 Last updated: ${new Date().toLocaleTimeString()}`;
+
   } catch (err) {
     console.warn('Score fetch error:', err.message);
   }
 }
 
+// ── Header ────────────────────────────────────────────────────────────────────
 function renderHeader(game, participants) {
   document.getElementById('sb-format-label').textContent = game.format.toUpperCase() + ' MATCH';
-  document.getElementById('sb-match-name').textContent = `${game.teamAName} vs ${game.teamBName}`;
-  document.getElementById('sb-bet').textContent = ' ' + formatPoints(game.betAmount);
-  document.getElementById('sb-pot').textContent = ' ' + formatPoints(game.betAmount * participants.length);
-  document.getElementById('sb-room').textContent = ' ' + game.roomCode;
+  document.getElementById('sb-match-name').textContent   = `${game.teamAName} vs ${game.teamBName}`;
+  document.getElementById('sb-bet').textContent          = ' ' + formatPoints(game.betAmount);
+  document.getElementById('sb-pot').textContent          = ' ' + formatPoints(game.betAmount * participants.length);
+  document.getElementById('sb-room').textContent         = ' ' + game.roomCode;
 
   const badge = document.getElementById('sb-live-badge');
   if (game.status === 'live') {
@@ -177,140 +270,205 @@ function renderHeader(game, participants) {
   } else if (game.status === 'finished') {
     badge.innerHTML = '<span class="badge badge-done">FINISHED</span>';
     document.getElementById('sb-section-title').textContent = '📊 Final Scores';
-    clearInterval(pollInterval);
   }
 }
 
+// ── Score cards ───────────────────────────────────────────────────────────────
 function renderScoreboards(game, participants) {
-  const topRuns = Math.max(...participants.map(p => p.totalRuns));
-  const grid = document.getElementById('scoreboard-grid');
+  const allZero  = participants.every(p => p.totalRuns === 0);
+  const topRuns  = Math.max(...participants.map(p => p.totalRuns));
+  const grid     = document.getElementById('scoreboard-grid');
+
   grid.innerHTML = participants.map(p => {
-    const isLeading = p.totalRuns === topRuns && topRuns > 0;
-    const isYou = p.userId === user.id;
+    const isLeading = !allZero && p.totalRuns === topRuns;
+    const isYou     = p.userId === user.id;
+
+    const picksHtml = p.selectedPositions.map(pos => {
+      const info    = getBatsmanInfo(pos.team, pos.position);
+      const hasRuns = info.runs !== '—' && info.runs > 0;
+
+      return `
+      <div class="pick-row">
+        <div class="pick-top">
+          <div class="pick-left">
+            <span class="pick-team-tag ${pos.team}">${pos.team}</span>
+            <span style="font-weight:600;font-size:0.82rem">#${pos.position}</span>
+          </div>
+          <div style="text-align:right">
+            ${allZero || !matchStarted
+              ? `<span class="pick-runs-pending">Awaiting</span>`
+              : `<div class="pick-runs-big">${info.runs}<small> runs</small></div>`
+            }
+          </div>
+        </div>
+        <div class="pick-player-name">${escHtml(info.name)}</div>
+        ${info.status && info.status !== 'yet to bat'
+          ? `<div class="pick-status">${escHtml(info.status)}</div>`
+          : ''
+        }
+      </div>`;
+    }).join('');
+
     return `
-    <div class="score-card ${isLeading ? 'leading' : ''}">
+    <div class="score-card ${isLeading ? 'leading' : ''} ${isYou ? 'my-card' : ''}">
       <div class="score-card-header">
         <div>
-          <div class="player-name">${escHtml(p.username)}${isYou ? ' <span style="font-size:0.7rem;color:var(--text2)">(You)</span>' : ''}</div>
-          ${isLeading ? '<div style="font-size:0.75rem;color:var(--gold)">👑 Leading</div>' : ''}
+          <div style="font-weight:700;font-size:0.95rem">
+            ${escHtml(p.username)}
+            ${isYou ? '<span style="font-size:0.7rem;color:var(--text2);margin-left:4px">(You)</span>' : ''}
+          </div>
+          ${isLeading ? '<div style="font-size:0.75rem;color:var(--gold);margin-top:2px">👑 Leading</div>' : ''}
         </div>
-        <div class="total">${p.totalRuns} <span style="font-size:0.8rem;font-weight:400;color:var(--text2)">runs</span></div>
+        <div style="text-align:right">
+          ${allZero || !matchStarted
+            ? '<div style="font-size:0.9rem;color:var(--text2)">—</div>'
+            : `<div style="font-size:1.6rem;font-weight:800;color:var(--gold);line-height:1">${p.totalRuns}</div>
+               <div style="font-size:0.72rem;color:var(--text2)">total runs</div>`
+          }
+        </div>
       </div>
-      <div class="score-card-body">
-        ${p.selectedPositions.map(pos => {
-          const batsmanInfo = getBatsmanInfo(pos.team, pos.position);
-          return `
-          <div class="pick-row">
-            <div class="pick-pos">
-              <span class="pick-team-tag ${pos.team}">${pos.team}</span>
-              <span>#${pos.position}</span>
-              <span class="pick-batsman">${escHtml(batsmanInfo.name)}</span>
-            </div>
-            <div class="pick-runs">${batsmanInfo.runs} <span style="font-size:0.75rem;font-weight:400;color:var(--text2)">runs</span></div>
-          </div>`;
-        }).join('')}
+      <div class="score-card-body">${picksHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+function renderLeaderboard(participants) {
+  const allZero = participants.every(p => p.totalRuns === 0);
+  const sorted  = allZero
+    ? [...participants]
+    : [...participants].sort((a, b) => b.totalRuns - a.totalRuns);
+
+  const medals = ['🥇', '🥈', '🥉'];
+
+  document.getElementById('leaderboard').innerHTML = sorted.map((p, i) => `
+    <div class="lb-row ${!allZero && i === 0 ? 'rank-1' : ''}">
+      <div class="lb-rank ${!allZero && i === 0 ? 'gold' : ''}">
+        ${!allZero && i < 3 ? medals[i] : i + 1}
+      </div>
+      <div class="lb-name">
+        ${escHtml(p.username)}
+        ${p.userId === user.id ? '<span style="color:var(--text2);font-size:0.78rem;margin-left:4px">(You)</span>' : ''}
+      </div>
+      <div class="lb-runs">
+        ${allZero || !matchStarted
+          ? '<span style="color:var(--text2);font-size:0.85rem">Awaiting start</span>'
+          : `${p.totalRuns} <span style="font-size:0.72rem;color:var(--text2);font-weight:400">runs</span>`
+        }
+      </div>
+    </div>`).join('');
+}
+
+// ── Get batsman info from live scorecard ─────────────────────────────────────
+function getBatsmanInfo(team, position) {
+  if (!scorecard || !scorecard.teams) {
+    return { name: `${team === 'A' ? 'Team A' : 'Team B'} Batsman #${position}`, runs: '—', status: '' };
+  }
+  const idx     = team === 'A' ? 0 : 1;
+  const teamObj = scorecard.teams[idx];
+  const b       = teamObj?.batsmen?.find(x => x.position === position);
+  if (!b) return { name: `${teamObj?.name || 'Team'} Batsman #${position}`, runs: 0, status: 'yet to bat' };
+  return { name: b.name, runs: b.runs, status: b.status || '' };
+}
+
+// ── Full scorecard table ──────────────────────────────────────────────────────
+function renderMatchScorecard(sc, game, participants) {
+  const el = document.getElementById('match-scorecard');
+  if (!sc?.teams?.length) { el.innerHTML = '<p class="text-muted">Scorecard not available yet.</p>'; return; }
+
+  // Build set of all picked positions for highlight
+  const pickedSet = new Set();
+  if (participants) {
+    participants.forEach(p => {
+      (p.selectedPositions || []).forEach(pos => pickedSet.add(`${pos.team}${pos.position}`));
+    });
+  }
+
+  el.innerHTML = sc.teams.map((team, idx) => {
+    const teamKey = idx === 0 ? 'A' : 'B';
+    return `
+    <div class="card ${idx > 0 ? 'mt-3' : ''} mb-3">
+      <div class="card-title">
+        <span class="pick-team-tag ${teamKey}" style="font-size:0.8rem">${teamKey}</span>
+        ${escHtml(team.name)} — Batting
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:0.875rem">
+          <thead>
+            <tr style="color:var(--text2);border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:8px 8px;white-space:nowrap"># Pos</th>
+              <th style="text-align:left;padding:8px 8px">Player Name</th>
+              <th style="text-align:right;padding:8px 8px">Runs</th>
+              <th style="text-align:right;padding:8px 8px">Balls</th>
+              <th style="text-align:left;padding:8px 8px">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${team.batsmen.map(b => {
+              const isPicked = pickedSet.has(`${teamKey}${b.position}`);
+              return `
+              <tr class="${isPicked ? 'sc-row-picked' : ''}" style="border-bottom:1px solid var(--border)">
+                <td style="padding:10px 8px;color:var(--text2);font-weight:600">
+                  #${b.position}
+                  ${isPicked ? '<span title="Picked by a player" style="color:var(--gold);margin-left:4px">⭐</span>' : ''}
+                </td>
+                <td style="padding:10px 8px;font-weight:700">${escHtml(b.name)}</td>
+                <td style="padding:10px 8px;text-align:right;font-size:1.05rem;font-weight:800;color:${b.runs > 0 ? 'var(--gold)' : 'var(--text2)'}">
+                  ${b.runs}
+                </td>
+                <td style="padding:10px 8px;text-align:right;color:var(--text2)">${b.balls}</td>
+                <td style="padding:10px 8px;color:var(--text2);font-size:0.78rem">${escHtml(b.status || '—')}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
       </div>
     </div>`;
   }).join('');
 }
 
-function getBatsmanInfo(team, position) {
-  if (!scorecard || !scorecard.teams) return { name: `Batsman ${position}`, runs: '—' };
-  const idx = team === 'A' ? 0 : 1;
-  const batsman = scorecard.teams[idx]?.batsmen?.find(b => b.position === position);
-  return batsman ? { name: batsman.name, runs: batsman.runs } : { name: `Batsman ${position}`, runs: 0 };
-}
-
-function renderLeaderboard(participants) {
-  const sorted = [...participants].sort((a, b) => b.totalRuns - a.totalRuns);
-  document.getElementById('leaderboard').innerHTML = sorted.map((p, i) => `
-    <div class="lb-row ${i === 0 ? 'rank-1' : ''}">
-      <div class="lb-rank ${i === 0 ? 'gold' : ''}">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</div>
-      <div class="lb-name">${escHtml(p.username)}${p.userId === user.id ? ' <span style="color:var(--text2);font-size:0.8rem">(You)</span>' : ''}</div>
-      <div class="lb-runs">${p.totalRuns} <span style="font-size:0.75rem;color:var(--text2);font-weight:400">runs</span></div>
-    </div>`).join('');
-}
-
-function renderMatchScorecard(sc, game) {
-  const el = document.getElementById('match-scorecard');
-  if (!sc || !sc.teams || !sc.teams.length) { el.innerHTML = '<p class="text-muted">Scorecard not available</p>'; return; }
-
-  el.innerHTML = sc.teams.map((team, idx) => `
-    <div class="card mb-3 ${idx > 0 ? 'mt-3' : ''}">
-      <div class="card-title">
-        <span class="pick-team-tag ${idx === 0 ? 'A' : 'B'}" style="font-size:0.8rem">${idx === 0 ? 'A' : 'B'}</span>
-        ${escHtml(team.name)} — Batting
-      </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:0.88rem">
-          <thead>
-            <tr style="color:var(--text2);border-bottom:1px solid var(--border)">
-              <th style="text-align:left;padding:8px 6px">#</th>
-              <th style="text-align:left;padding:8px 6px">Batsman</th>
-              <th style="text-align:right;padding:8px 6px">Runs</th>
-              <th style="text-align:right;padding:8px 6px">Balls</th>
-              <th style="text-align:left;padding:8px 6px">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${team.batsmen.map(b => `
-              <tr style="border-bottom:1px solid var(--border)">
-                <td style="padding:9px 6px;color:var(--text2)">${b.position}</td>
-                <td style="padding:9px 6px;font-weight:600">${escHtml(b.name)}</td>
-                <td style="padding:9px 6px;text-align:right;font-weight:700;color:var(--gold)">${b.runs}</td>
-                <td style="padding:9px 6px;text-align:right;color:var(--text2)">${b.balls}</td>
-                <td style="padding:9px 6px;color:var(--text2);font-size:0.8rem">${escHtml(b.status)}</td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>`).join('');
-}
-
 function renderMockScorecard() {
-  document.getElementById('match-scorecard').innerHTML = '<p class="text-muted" style="padding:12px">No match selected — scores are simulated for demo.</p>';
+  document.getElementById('match-scorecard').innerHTML =
+    '<p class="text-muted" style="padding:12px">No match selected — using simulated scores.</p>';
 }
 
+// ── Winner banner ─────────────────────────────────────────────────────────────
 function showWinnerBanner(game, participants, currentUserId) {
   if (game.status !== 'finished') return;
-  const sorted = [...participants].sort((a, b) => b.totalRuns - a.totalRuns);
+  const sorted  = [...participants].sort((a, b) => b.totalRuns - a.totalRuns);
   const topRuns = sorted[0].totalRuns;
   const winners = sorted.filter(p => p.totalRuns === topRuns);
-  const pot = game.betAmount * participants.length;
+  const pot     = game.betAmount * participants.length;
 
   const banner = document.getElementById('winner-banner');
   banner.classList.remove('hidden');
 
-  const isWinner = winners.some(w => w.userId === currentUserId);
   if (winners.length === 1) {
     document.getElementById('winner-text').textContent = `🏆 ${winners[0].username} Wins!`;
-    document.getElementById('winner-pot').textContent = `${formatPoints(pot)} earned · ${winners[0].totalRuns} runs`;
+    document.getElementById('winner-pot').textContent  = `${formatPoints(pot)} earned · ${winners[0].totalRuns} runs`;
   } else {
     document.getElementById('winner-text').textContent = `🤝 It's a Tie!`;
-    document.getElementById('winner-pot').textContent = `${winners.map(w=>w.username).join(' & ')} split ${formatPoints(pot)}`;
+    document.getElementById('winner-pot').textContent  = `${winners.map(w => w.username).join(' & ')} split ${formatPoints(pot)}`;
   }
 
-  if (isWinner) banner.style.borderColor = 'var(--gold)';
-}
-
-function showWinnerBannerFromResult(result) {
-  clearInterval(pollInterval);
-  loadScoreboard(); // reload with finished state
+  if (winners.some(w => w.userId === currentUserId)) {
+    banner.style.borderColor = 'var(--gold)';
+  }
 }
 
 async function finalizeGame() {
   if (!confirm('End the game and declare a winner based on current scores?')) return;
   try {
-    const res = await apiFetch(`/games/${gameId}/finalize`, { method: 'POST' });
+    await apiFetch(`/games/${gameId}/finalize`, { method: 'POST' });
+    clearInterval(pollInterval);
     loadScoreboard();
   } catch (err) {
     showAlert('alert-box', err.message);
   }
 }
 
-// Start
+// ── Boot ──────────────────────────────────────────────────────────────────────
 loadScoreboard();
-// Poll every 15 seconds for live updates
 pollInterval = setInterval(loadScoreboard, 15000);
 window.addEventListener('beforeunload', () => clearInterval(pollInterval));
 </script>

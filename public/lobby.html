@@ -5,109 +5,214 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CricketBet — Game Lobby</title>
   <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    /* ── Draft Board ── */
+    .draft-turn-banner {
+      padding: 18px 20px; border-radius: var(--radius); margin-bottom: 20px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .draft-turn-banner.your-turn {
+      background: rgba(26,122,60,0.2); border: 2px solid var(--green-lt);
+      animation: glow 1.8s ease-in-out infinite;
+    }
+    .draft-turn-banner.waiting {
+      background: var(--bg3); border: 1px solid var(--border);
+    }
+    @keyframes glow {
+      0%,100% { box-shadow: 0 0 0 rgba(45,168,86,0); }
+      50%      { box-shadow: 0 0 20px rgba(45,168,86,0.35); }
+    }
+    .turn-icon { font-size: 2rem; flex-shrink: 0; }
+    .turn-title { font-size: 1rem; font-weight: 700; }
+    .turn-sub   { font-size: 0.82rem; color: var(--text2); margin-top: 2px; }
+
+    /* ── Draft Progress ── */
+    .draft-progress { display: flex; flex-direction: column; gap: 10px; }
+    .draft-row {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .draft-row.active-player { border-color: var(--green-lt); background: rgba(26,122,60,0.1); }
+    .draft-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--green); display: flex; align-items: center;
+      justify-content: center; font-weight: 700; font-size: 0.9rem; flex-shrink: 0;
+    }
+    .draft-picks-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .pick-chip {
+      padding: 3px 9px; border-radius: 20px; font-size: 0.75rem; font-weight: 700;
+      border: 1px solid var(--border);
+    }
+    .pick-chip.A { background: rgba(59,130,246,0.15); color: #93c5fd; border-color: rgba(59,130,246,0.3); }
+    .pick-chip.B { background: rgba(168,85,247,0.15); color: #c084fc; border-color: rgba(168,85,247,0.3); }
+    .pick-chip.empty { background: var(--bg2); color: var(--text2); border-style: dashed; }
+
+    /* ── Position buttons ── */
+    .team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .team-section { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+    .team-header {
+      font-weight: 700; text-align: center; padding: 8px; border-radius: 8px;
+      margin-bottom: 10px; font-size: 0.88rem;
+    }
+    .team-a .team-header { background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.2); }
+    .team-b .team-header { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.2); }
+
+    .pos-btn {
+      width: 100%; padding: 11px 12px; margin-bottom: 7px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); cursor: pointer;
+      display: flex; align-items: center; gap: 10px;
+      transition: all 0.15s; font-size: 0.88rem;
+    }
+    .pos-btn:hover:not(:disabled) { border-color: var(--green-lt); background: rgba(26,122,60,0.12); }
+    .pos-btn.taken { opacity: 0.38; cursor: not-allowed; text-decoration: line-through; }
+    .pos-btn.mine  { background: rgba(26,122,60,0.2); border-color: var(--green-lt); }
+    .pos-btn.others { background: rgba(100,116,139,0.12); border-color: rgba(100,116,139,0.3); }
+    .pos-btn:disabled { cursor: not-allowed; }
+    .pos-number {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--bg3); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 0.82rem; flex-shrink: 0;
+    }
+    .pos-btn.mine .pos-number { background: var(--green); border-color: var(--green-lt); }
+
+    /* Progress bar */
+    .draft-progress-bar {
+      height: 6px; background: var(--bg3); border-radius: 3px;
+      overflow: hidden; margin: 12px 0;
+    }
+    .draft-progress-bar-fill {
+      height: 100%; background: var(--green-lt);
+      border-radius: 3px; transition: width 0.4s ease;
+    }
+
+    @media (max-width:600px) { .team-grid { grid-template-columns: 1fr; } }
+  </style>
 </head>
 <body>
 
 <div id="navbar"></div>
 
-<div class="container" style="padding-top:24px; padding-bottom:40px; max-width:680px;">
+<div class="container" style="padding-top:24px;padding-bottom:40px;max-width:700px;">
 
   <div id="alert-box"></div>
   <div id="page-loading" class="loading"><div class="spinner"></div>Loading lobby…</div>
 
   <div id="lobby-content" class="hidden">
 
-    <!-- WAITING PHASE -->
+    <!-- ══ WAITING PHASE ══════════════════════════════════════════════════ -->
     <div id="phase-waiting">
       <div class="card mb-3">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
           <div>
             <div id="match-title" style="font-size:1.1rem;font-weight:700"></div>
             <div id="match-meta" style="color:var(--text2);font-size:0.85rem;margin-top:4px"></div>
           </div>
           <div id="format-badge"></div>
         </div>
-
         <hr class="divider" />
-
         <div class="card-title">🔑 Room Code — Share with friends!</div>
         <div class="room-code-display" id="room-code">——</div>
-        <button class="btn btn-outline btn-full mt-2" onclick="copyRoomCode()">📋 Copy Room Code</button>
+        <button class="btn btn-outline btn-full mt-2" onclick="copyCode()">📋 Copy Room Code</button>
       </div>
 
       <div class="card mb-3">
         <div class="card-title">👥 Players (<span id="player-count">0</span> / <span id="max-players">5</span>)</div>
         <p class="text-muted mb-3" style="font-size:0.85rem">Waiting for players to join. You need at least 2 to start.</p>
-        <div class="player-list" id="player-list">
-          <div class="loading"><div class="spinner"></div></div>
-        </div>
+        <div class="player-list" id="player-list"><div class="loading"><div class="spinner"></div></div></div>
       </div>
 
       <div class="card">
         <div class="card-title">💰 Bet Details</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
           <div style="text-align:center;background:var(--bg3);border-radius:8px;padding:14px">
-            <div style="color:var(--text2);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em">Bet Per Player</div>
+            <div style="color:var(--text2);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em">Bet Per Player</div>
             <div style="font-size:1.5rem;font-weight:800;color:var(--gold)" id="bet-amount">—</div>
           </div>
           <div style="text-align:center;background:var(--bg3);border-radius:8px;padding:14px">
-            <div style="color:var(--text2);font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em">Total Pot</div>
+            <div style="color:var(--text2);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em">Total Pot</div>
             <div style="font-size:1.5rem;font-weight:800;color:var(--gold)" id="total-pot">—</div>
           </div>
         </div>
         <div id="host-controls" class="hidden mt-3">
-          <button class="btn btn-primary btn-full btn-lg" id="start-btn" onclick="startGame()">Start Game 🏏</button>
-          <p class="text-muted text-center mt-2" style="font-size:0.82rem">Only you (the host) can start the game</p>
+          <button class="btn btn-primary btn-full btn-lg" id="start-btn" onclick="startGame()">🏏 Start Draft</button>
+          <p class="text-muted text-center mt-2" style="font-size:0.82rem">Only you (the host) can start</p>
         </div>
       </div>
     </div>
 
-    <!-- SELECTION PHASE -->
+    <!-- ══ SELECTING / DRAFT PHASE ════════════════════════════════════════ -->
     <div id="phase-selecting" class="hidden">
+
+      <!-- Match info strip -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="color:var(--text2);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em">Draft in progress</div>
+          <div style="font-weight:700;font-size:1.05rem"><span id="sel-team-a">Team A</span> vs <span id="sel-team-b">Team B</span></div>
+        </div>
+        <span id="sel-format-badge"></span>
+      </div>
+
+      <!-- Whose turn banner -->
+      <div id="turn-banner" class="draft-turn-banner waiting mb-3">
+        <div class="turn-icon" id="turn-icon">⏳</div>
+        <div>
+          <div class="turn-title" id="turn-title">Loading…</div>
+          <div class="turn-sub"  id="turn-sub"></div>
+        </div>
+      </div>
+
+      <!-- Draft progress bar -->
+      <div class="draft-progress-bar mb-3">
+        <div class="draft-progress-bar-fill" id="progress-bar" style="width:0%"></div>
+      </div>
+
+      <!-- Per-player picks display -->
       <div class="card mb-3">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div style="font-size:0.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em">Select Your Players</div>
-            <div style="font-size:1.1rem;font-weight:700;margin-top:2px"><span id="sel-team-a">Team A</span> vs <span id="sel-team-b">Team B</span></div>
+        <div class="card-title">📋 Draft Board</div>
+        <div class="draft-progress" id="draft-board"></div>
+      </div>
+
+      <!-- Alert for errors -->
+      <div id="selection-alert"></div>
+
+      <!-- Position buttons (only visible on your turn) -->
+      <div id="pick-ui">
+        <div class="card mb-3" id="pick-card">
+          <div class="card-title">🎯 Pick 1 Position</div>
+          <p class="text-muted mb-3" style="font-size:0.85rem">Click a batting position to claim it. Each pick locks immediately.</p>
+          <div class="team-grid">
+            <div class="team-section team-a">
+              <div class="team-header">🔵 <span id="pick-team-a">Team A</span></div>
+              <div id="pos-A"></div>
+            </div>
+            <div class="team-section team-b">
+              <div class="team-header">🟣 <span id="pick-team-b">Team B</span></div>
+              <div id="pos-B"></div>
+            </div>
           </div>
-          <span id="sel-format-badge"></span>
         </div>
       </div>
 
-      <div id="already-ready-banner" class="hidden">
-        <div class="alert alert-success">✅ You've submitted your picks! Waiting for other players…</div>
-        <div id="ready-status-list"></div>
-      </div>
-
-      <div id="selection-ui">
-        <div class="card mb-3">
-          <div class="card-title">🎯 Your Pick Budget</div>
-          <div class="picks-counter">
-            <div class="count"><span id="picks-used">0</span> / <span id="picks-total">5</span></div>
-            <div style="color:var(--text2);font-size:0.85rem">positions selected</div>
-          </div>
-          <div id="taken-notice" class="alert alert-info hidden" style="font-size:0.85rem">Some positions are already taken by other players and are shown in grey.</div>
-        </div>
-
-        <div class="team-grid">
-          <div class="team-section team-a">
-            <div class="team-header">🔵 <span id="team-a-label">Team A</span><br><small style="font-weight:400;opacity:0.8">Batting Positions 1–5</small></div>
-            <div id="team-a-positions"></div>
-          </div>
-          <div class="team-section team-b">
-            <div class="team-header">🟣 <span id="team-b-label">Team B</span><br><small style="font-weight:400;opacity:0.8">Batting Positions 1–5</small></div>
-            <div id="team-b-positions"></div>
-          </div>
-        </div>
-
-        <div class="card mt-3">
-          <div id="selection-alert"></div>
-          <button class="btn btn-primary btn-full btn-lg" id="submit-picks-btn" onclick="submitPicks()" disabled>
-            Submit Picks
-          </button>
-          <p class="text-center mt-2 text-muted" style="font-size:0.82rem">Select exactly <strong id="picks-required">5</strong> positions, then hit Submit</p>
+      <!-- Waiting message (shown when not your turn) -->
+      <div id="wait-ui" class="hidden">
+        <div class="card text-center">
+          <div style="font-size:2.5rem;margin-bottom:8px">⏳</div>
+          <div style="font-weight:700;font-size:1rem" id="wait-message">Waiting for other player…</div>
+          <p class="text-muted mt-2" style="font-size:0.85rem">The page refreshes automatically every 3 seconds</p>
         </div>
       </div>
+
+      <!-- All done message -->
+      <div id="done-ui" class="hidden">
+        <div class="card text-center">
+          <div style="font-size:2.5rem;margin-bottom:8px">✅</div>
+          <div style="font-weight:700;font-size:1.1rem">Draft Complete! Starting match…</div>
+        </div>
+      </div>
+
     </div>
 
   </div>
@@ -117,25 +222,26 @@
 <script>
 if (!requireAuth()) throw new Error('not authed');
 
-const params = new URLSearchParams(location.search);
-const gameId = params.get('game');
+const params  = new URLSearchParams(location.search);
+const gameId  = params.get('game');
 if (!gameId) location.href = '/dashboard.html';
 
 const user = getUser();
-let lobbyData = null;
-let selectedPositions = [];
-let pollInterval = null;
+let pollInterval  = null;
+let isPicking     = false; // prevent double-click
 
+// ── Main load / poll ─────────────────────────────────────────────────────────
 async function loadLobby() {
   try {
-    lobbyData = await apiFetch(`/games/${gameId}/lobby`);
-    const { game, participants, currentUserId, takenPositions, pickAllocation } = lobbyData;
+    const data = await apiFetch(`/games/${gameId}/lobby`);
+    const { game, participants, currentUserId, takenPositions, draft } = data;
 
     document.getElementById('page-loading').classList.add('hidden');
     document.getElementById('lobby-content').classList.remove('hidden');
 
-    // Redirect if live
+    // Redirect when fully live
     if (game.status === 'live' || game.status === 'finished') {
+      clearInterval(pollInterval);
       window.location.href = `/scoreboard.html?game=${gameId}`;
       return;
     }
@@ -143,28 +249,29 @@ async function loadLobby() {
     if (game.status === 'waiting') {
       renderWaiting(game, participants, currentUserId);
     } else if (game.status === 'selecting') {
-      renderSelecting(game, participants, currentUserId, takenPositions, pickAllocation);
+      renderDraft(game, participants, currentUserId, takenPositions, draft);
     }
   } catch (err) {
     document.getElementById('page-loading').innerHTML = `<div class="alert alert-error">${escHtml(err.message)}</div>`;
   }
 }
 
+// ── Waiting room ─────────────────────────────────────────────────────────────
 function renderWaiting(game, participants, currentUserId) {
   document.getElementById('phase-waiting').classList.remove('hidden');
   document.getElementById('phase-selecting').classList.add('hidden');
 
   document.getElementById('match-title').textContent = `${game.teamAName} vs ${game.teamBName}`;
-  document.getElementById('match-meta').textContent = `Bet: ${formatPoints(game.betAmount)} per player`;
-  document.getElementById('format-badge').innerHTML = formatBadge(game.format);
-  document.getElementById('room-code').textContent = game.roomCode;
+  document.getElementById('match-meta').textContent  = `Bet: ${formatPoints(game.betAmount)} per player`;
+  document.getElementById('format-badge').innerHTML  = formatBadge(game.format);
+  document.getElementById('room-code').textContent   = game.roomCode;
   document.getElementById('player-count').textContent = participants.length;
-  document.getElementById('max-players').textContent = game.maxPlayers;
-  document.getElementById('bet-amount').textContent = formatPoints(game.betAmount);
-  document.getElementById('total-pot').textContent = formatPoints(game.betAmount * participants.length) + ' +';
+  document.getElementById('max-players').textContent  = game.maxPlayers;
+  document.getElementById('bet-amount').textContent   = formatPoints(game.betAmount);
+  document.getElementById('total-pot').textContent    = formatPoints(game.betAmount * participants.length) + '+';
 
   const listEl = document.getElementById('player-list');
-  const slots = [];
+  const slots  = [];
   for (let i = 0; i < game.maxPlayers; i++) {
     const p = participants[i];
     if (p) {
@@ -188,130 +295,203 @@ function renderWaiting(game, participants, currentUserId) {
   listEl.innerHTML = slots.join('');
 
   const isHost = game.createdBy === currentUserId;
-  const hostCtrl = document.getElementById('host-controls');
   if (isHost) {
-    hostCtrl.classList.remove('hidden');
+    document.getElementById('host-controls').classList.remove('hidden');
     document.getElementById('start-btn').disabled = participants.length < 2;
   }
 }
 
-function renderSelecting(game, participants, currentUserId, takenPositions, pickAllocation) {
-  document.getElementById('phase-waiting').classList.add('hidden');
+// ── Draft phase ───────────────────────────────────────────────────────────────
+function renderDraft(game, participants, currentUserId, takenPositions, draft) {
+  document.getElementById('phase-waiting').classList.remove('hidden');  // keep header
+  document.getElementById('phase-waiting').style.display = 'none';
   document.getElementById('phase-selecting').classList.remove('hidden');
 
-  document.getElementById('sel-team-a').textContent = game.teamAName;
-  document.getElementById('sel-team-b').textContent = game.teamBName;
+  document.getElementById('sel-team-a').textContent    = game.teamAName;
+  document.getElementById('sel-team-b').textContent    = game.teamBName;
   document.getElementById('sel-format-badge').innerHTML = formatBadge(game.format);
-  document.getElementById('team-a-label').textContent = game.teamAName;
-  document.getElementById('team-b-label').textContent = game.teamBName;
+  document.getElementById('pick-team-a').textContent   = game.teamAName;
+  document.getElementById('pick-team-b').textContent   = game.teamBName;
 
-  const myIdx = participants.findIndex(p => p.userId === currentUserId);
-  const myAllocation = pickAllocation[myIdx] ?? 0;
-  const myRecord = participants[myIdx];
+  const isMyTurn = draft.currentTurnUserId === currentUserId;
+  const pct = draft.totalNeeded > 0 ? Math.round((draft.totalPicksMade / draft.totalNeeded) * 100) : 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
 
-  document.getElementById('picks-total').textContent = myAllocation;
-  document.getElementById('picks-required').textContent = myAllocation;
+  // ── Turn banner ──
+  const banner    = document.getElementById('turn-banner');
+  const turnIcon  = document.getElementById('turn-icon');
+  const turnTitle = document.getElementById('turn-title');
+  const turnSub   = document.getElementById('turn-sub');
 
-  // Show ready status
-  const statusList = document.getElementById('ready-status-list');
-  statusList.innerHTML = `
-    <div class="card card-sm">
-      <div class="card-title">Player Readiness</div>
-      ${participants.map(p => `
-        <div class="player-slot ${p.isReady ? 'filled' : 'empty'}" style="margin-bottom:8px">
-          <div class="player-avatar" style="${p.isReady ? '' : 'background:var(--bg3);color:var(--text2)'}">${p.username[0].toUpperCase()}</div>
-          <div class="player-name">${escHtml(p.username)}${p.userId === currentUserId ? ' (You)' : ''}</div>
-          <span style="margin-left:auto">${p.isReady ? '✅ Ready' : '⏳ Selecting…'}</span>
-        </div>`).join('')}
+  if (draft.allDone) {
+    banner.className = 'draft-turn-banner waiting mb-3';
+    turnIcon.textContent  = '✅';
+    turnTitle.textContent = 'All picks done! Starting match…';
+    turnSub.textContent   = '';
+  } else if (isMyTurn) {
+    banner.className = 'draft-turn-banner your-turn mb-3';
+    turnIcon.textContent  = '🎯';
+    turnTitle.textContent = 'YOUR TURN — Pick 1 position!';
+    turnSub.textContent   = `${draft.totalPicksMade} of ${draft.totalNeeded} total picks made`;
+  } else {
+    banner.className = 'draft-turn-banner waiting mb-3';
+    turnIcon.textContent  = '⏳';
+    turnTitle.textContent = `Waiting for ${escHtml(draft.currentTurnUsername || 'player')} to pick…`;
+    turnSub.textContent   = `${draft.totalPicksMade} of ${draft.totalNeeded} total picks made`;
+  }
+
+  // ── Draft board ──
+  const boardEl = document.getElementById('draft-board');
+  const takenKeys = (takenPositions || []).map(p => `${p.team}${p.position}`);
+
+  boardEl.innerHTML = participants.map((p, i) => {
+    const isActive = draft.currentTurnUserId === p.userId && !draft.allDone;
+    const isYou    = p.userId === currentUserId;
+
+    // Build pick chips
+    const chipsHtml = (() => {
+      const chips = [];
+      for (let k = 0; k < p.picksAllowed; k++) {
+        const pick = p.selectedPositions[k];
+        if (pick) {
+          chips.push(`<span class="pick-chip ${pick.team}">${pick.team}${pick.position}</span>`);
+        } else {
+          chips.push(`<span class="pick-chip empty">—</span>`);
+        }
+      }
+      return chips.join('');
+    })();
+
+    return `
+    <div class="draft-row ${isActive ? 'active-player' : ''}">
+      <div class="draft-avatar" style="${isYou ? 'border:2px solid var(--gold)' : ''}">${p.username[0].toUpperCase()}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:0.9rem">
+          ${escHtml(p.username)}${isYou ? ' <span style="color:var(--text2);font-size:0.75rem">(You)</span>' : ''}
+          ${isActive ? ' <span style="color:var(--green-lt);font-size:0.75rem">← picking now</span>' : ''}
+        </div>
+        <div class="draft-picks-row mt-2">${chipsHtml}</div>
+      </div>
+      <div style="text-align:right;font-size:0.8rem;color:var(--text2);flex-shrink:0">
+        ${p.picksMade}/${p.picksAllowed}
+      </div>
     </div>`;
+  }).join('');
 
-  if (myRecord && myRecord.isReady) {
-    document.getElementById('already-ready-banner').classList.remove('hidden');
-    document.getElementById('selection-ui').classList.add('hidden');
+  // ── Position buttons or wait message ──
+  const pickUi = document.getElementById('pick-ui');
+  const waitUi = document.getElementById('wait-ui');
+  const doneUi = document.getElementById('done-ui');
+
+  if (draft.allDone) {
+    pickUi.classList.add('hidden');
+    waitUi.classList.add('hidden');
+    doneUi.classList.remove('hidden');
     return;
   }
 
-  // Build position buttons
-  const takenKeys = (takenPositions || []).map(t => `${t.team}${t.position}`);
-  if (takenKeys.length) document.getElementById('taken-notice').classList.remove('hidden');
+  if (isMyTurn) {
+    pickUi.classList.remove('hidden');
+    waitUi.classList.add('hidden');
+    renderPositionButtons(takenPositions, participants, currentUserId);
+  } else {
+    pickUi.classList.add('hidden');
+    waitUi.classList.remove('hidden');
+    document.getElementById('wait-message').textContent =
+      `Waiting for ${draft.currentTurnUsername || 'another player'} to pick…`;
+  }
+}
 
-  ['A','B'].forEach(team => {
-    const container = document.getElementById(`team-${team === 'A' ? 'a' : 'b'}-positions`);
+function renderPositionButtons(takenPositions, participants, currentUserId) {
+  const takenKeys = (takenPositions || []).map(p => `${p.team}${p.position}`);
+
+  // Find which positions are mine (to style them differently)
+  const me     = participants.find(p => p.userId === currentUserId);
+  const myKeys = (me?.selectedPositions || []).map(p => `${p.team}${p.position}`);
+
+  // Find who owns each position (for label)
+  const ownerMap = {};
+  participants.forEach(p => {
+    (p.selectedPositions || []).forEach(sp => {
+      ownerMap[`${sp.team}${sp.position}`] = p.username;
+    });
+  });
+
+  ['A', 'B'].forEach(team => {
+    const container = document.getElementById(`pos-${team}`);
     container.innerHTML = '';
     for (let pos = 1; pos <= 5; pos++) {
-      const key = `${team}${pos}`;
+      const key     = `${team}${pos}`;
       const isTaken = takenKeys.includes(key);
+      const isMine  = myKeys.includes(key);
+      const owner   = ownerMap[key];
+
+      const ordinal = pos === 1 ? '1st' : pos === 2 ? '2nd' : pos === 3 ? '3rd' : `${pos}th`;
+
       const btn = document.createElement('button');
-      btn.className = `pos-btn ${isTaken ? 'taken' : ''}`;
-      btn.disabled = isTaken;
-      btn.id = `pos-${key}`;
-      btn.dataset.team = team;
-      btn.dataset.pos = pos;
+      btn.className = `pos-btn ${isTaken ? (isMine ? 'mine' : 'taken others') : ''}`;
+      btn.disabled  = isTaken || isPicking;
       btn.innerHTML = `
         <div class="pos-number">${pos}</div>
-        <div>
-          <div>${pos === 1 ? '1st' : pos === 2 ? '2nd' : pos === 3 ? '3rd' : pos + 'th'} Batsman</div>
-          <div style="font-size:0.75rem;color:var(--text2)">${isTaken ? 'Already taken' : 'Batting order #' + pos}</div>
+        <div style="flex:1">
+          <div>${ordinal} Batsman</div>
+          <div style="font-size:0.75rem;color:var(--text2)">
+            ${isMine ? '✅ Your pick' : isTaken ? `Taken by ${escHtml(owner || 'player')}` : 'Batting order #' + pos}
+          </div>
         </div>`;
-      if (!isTaken) btn.onclick = () => togglePosition(team, pos, myAllocation);
+
+      if (!isTaken) {
+        btn.onclick = () => submitPick(team, pos);
+      }
       container.appendChild(btn);
     }
   });
 }
 
-function togglePosition(team, pos, maxPicks) {
-  const key = `${team}${pos}`;
-  const idx = selectedPositions.findIndex(p => p.team === team && p.position === pos);
-  if (idx >= 0) {
-    selectedPositions.splice(idx, 1);
-    document.getElementById(`pos-${key}`).classList.remove('selected');
-  } else {
-    if (selectedPositions.length >= maxPicks) {
-      showAlert('selection-alert', `You can only pick ${maxPicks} position(s). Deselect one first.`, 'error');
+// ── Submit a single pick ─────────────────────────────────────────────────────
+async function submitPick(team, position) {
+  if (isPicking) return;
+  isPicking = true;
+  clearAlert('selection-alert');
+
+  // Visual feedback — disable all buttons immediately
+  document.querySelectorAll('.pos-btn').forEach(b => b.disabled = true);
+
+  try {
+    const res = await apiFetch(`/games/${gameId}/pick`, {
+      method: 'POST',
+      body: JSON.stringify({ team, position })
+    });
+
+    if (res.allReady) {
+      clearInterval(pollInterval);
+      window.location.href = `/scoreboard.html?game=${gameId}`;
       return;
     }
-    selectedPositions.push({ team, position: pos });
-    document.getElementById(`pos-${key}`).classList.add('selected');
+
+    showAlert('selection-alert', res.message || 'Pick saved!', 'success');
+    await loadLobby(); // refresh UI immediately
+  } catch (err) {
+    showAlert('selection-alert', err.message, 'error');
+  } finally {
+    isPicking = false;
   }
-  clearAlert('selection-alert');
-  document.getElementById('picks-used').textContent = selectedPositions.length;
-  document.getElementById('submit-picks-btn').disabled = selectedPositions.length !== maxPicks;
 }
 
+// ── Start game ───────────────────────────────────────────────────────────────
 async function startGame() {
   const btn = document.getElementById('start-btn');
   btn.disabled = true; btn.textContent = 'Starting…';
   try {
     await apiFetch(`/games/${gameId}/start`, { method: 'POST' });
-    loadLobby();
+    await loadLobby();
   } catch (err) {
     showAlert('alert-box', err.message);
-    btn.disabled = false; btn.textContent = 'Start Game 🏏';
+    btn.disabled = false; btn.textContent = '🏏 Start Draft';
   }
 }
 
-async function submitPicks() {
-  const btn = document.getElementById('submit-picks-btn');
-  btn.disabled = true; btn.textContent = 'Submitting…';
-  clearAlert('selection-alert');
-  try {
-    const res = await apiFetch(`/games/${gameId}/select-positions`, {
-      method: 'POST',
-      body: JSON.stringify({ positions: selectedPositions })
-    });
-    if (res.allReady) {
-      window.location.href = `/scoreboard.html?game=${gameId}`;
-    } else {
-      showAlert('selection-alert', `Picks saved! Waiting for ${res.total - res.readyCount} more player(s)…`, 'success');
-      loadLobby(); // Refresh to show ready state
-    }
-  } catch (err) {
-    showAlert('selection-alert', err.message);
-    btn.disabled = false; btn.textContent = 'Submit Picks';
-  }
-}
-
-function copyRoomCode() {
+function copyCode() {
   const code = document.getElementById('room-code').textContent.trim();
   copyToClipboard(code);
   const btn = event.target;
@@ -319,9 +499,9 @@ function copyRoomCode() {
   setTimeout(() => btn.textContent = '📋 Copy Room Code', 2000);
 }
 
-// Poll every 4 seconds for lobby updates
+// ── Poll ─────────────────────────────────────────────────────────────────────
 loadLobby();
-pollInterval = setInterval(loadLobby, 4000);
+pollInterval = setInterval(loadLobby, 3000); // poll every 3s
 window.addEventListener('beforeunload', () => clearInterval(pollInterval));
 </script>
 </body>
